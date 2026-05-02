@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BioAI Blood Report Analyzer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">BioAI</p>
+          <h1>Blood report insights, made simple.</h1>
+          <p class="subcopy">Upload or paste report text to spot vitamins, hormones, lipids, glucose markers, and improvement ideas.</p>
+        </div>
+        <div class="score-orb" aria-label="Wellness score preview">
+          <span id="scoreValue">--</span>
+          <small>biomarker score</small>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <form id="reportForm" class="upload-panel">
+          <label class="dropzone" for="reportFile">
+            <input id="reportFile" name="report_file" type="file" accept=".txt,.csv,.tsv,.pdf" />
+            <span class="drop-icon">+</span>
+            <strong>Drop a report or choose file</strong>
+            <small>PDF, TXT, CSV, or paste text below.</small>
+          </label>
+
+          <label class="text-label" for="reportText">Report text</label>
+          <textarea id="reportText" name="report_text" placeholder="Example: Vitamin D 24 ng/mL&#10;HbA1c 5.2 %&#10;TSH 2.1 mIU/L&#10;Ferritin 42 ng/mL"></textarea>
+
+          <div class="actions">
+            <button class="primary" type="submit">Analyze report</button>
+            <button class="secondary" id="loadSample" type="button">Try sample</button>
+          </div>
+        </form>
+
+        <section class="results-panel" aria-live="polite">
+          <div class="summary-card">
+            <div>
+              <p class="eyebrow">AI-style review</p>
+              <h2 id="summaryTitle">Ready when your report is.</h2>
+              <p id="summaryText">Your biomarker cards will appear here with plain-language status, praise for strong values, and practical next steps.</p>
+            </div>
+            <div class="mini-stats">
+              <span><b id="greatCount">0</b> great</span>
+              <span><b id="focusCount">0</b> focus</span>
+            </div>
+          </div>
+
+          <div id="note" class="note hidden"></div>
+          <div id="markerGrid" class="report-sections"></div>
+          <p class="disclaimer" id="disclaimer">Educational only. This is not medical diagnosis.</p>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
