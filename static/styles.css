@@ -98,13 +98,52 @@ button:disabled {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 2px solid var(--primary);
+  border-bottom: 6px solid var(--primary-depth);
+  border-radius: 18px;
+  background: var(--primary);
+  color: #ffffff;
+  transform: rotate(-3deg);
+}
+
+.brand-mark .material-symbols-outlined {
+  font-size: 30px;
+}
+
+.brand-copy {
+  display: grid;
+  gap: 1px;
+}
+
+.brand-copy strong {
   color: #e83b9e;
   font-family: Lexend, sans-serif;
-  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-size: clamp(1.55rem, 3vw, 2.1rem);
   font-style: italic;
   font-weight: 900;
-  letter-spacing: -0.02em;
-  text-decoration: none;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.brand-copy small {
+  color: var(--text-soft);
+  font-family: Lexend, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .top-actions {
@@ -945,7 +984,21 @@ button:active {
 
 @media (max-width: 520px) {
   .brand {
-    font-size: 1.28rem;
+    gap: 9px;
+  }
+
+  .brand-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 15px;
+  }
+
+  .brand-copy strong {
+    font-size: 1.48rem;
+  }
+
+  .brand-copy small {
+    display: none;
   }
 
   .top-actions {

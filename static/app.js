@@ -148,8 +148,7 @@ function renderResult(result) {
   resultNav.classList.add("hidden");
 
   const score = result.score || 0;
-  scoreValue.textContent = score || "--";
-  scoreRing.style.setProperty("--score", score);
+  animateScore(score);
   summaryTitle.textContent = titleForScore(score, result.markers.length);
   summaryText.textContent = formatResultSummary(result);
   disclaimer.textContent = result.disclaimer;
@@ -182,6 +181,32 @@ function updateResultNav() {
   const footerTop = disclaimer.getBoundingClientRect().top + window.scrollY;
   const shouldShow = window.scrollY + window.innerHeight >= footerTop - 20;
   resultNav.classList.toggle("hidden", !shouldShow);
+}
+
+function animateScore(targetScore) {
+  const finalScore = Number(targetScore) || 0;
+  const duration = 950;
+  const startTime = performance.now();
+
+  scoreValue.textContent = finalScore ? "0" : "--";
+  scoreRing.style.setProperty("--score", 0);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      scoreRing.style.setProperty("--score", finalScore);
+    });
+  });
+
+  if (!finalScore) return;
+
+  function tick(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    scoreValue.textContent = Math.round(finalScore * eased);
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+
+  requestAnimationFrame(tick);
 }
 
 function formatResultSummary(result) {
