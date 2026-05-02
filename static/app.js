@@ -2,6 +2,7 @@ const form = document.querySelector("#reportForm");
 const fileInput = document.querySelector("#reportFile");
 const loadSample = document.querySelector("#loadSample");
 const markerGrid = document.querySelector("#markerGrid");
+const categoryGrid = document.querySelector("#categoryGrid");
 const summaryTitle = document.querySelector("#summaryTitle");
 const summaryText = document.querySelector("#summaryText");
 const scoreValue = document.querySelector("#scoreValue");
@@ -17,6 +18,9 @@ const backToStart = document.querySelector("#backToStart");
 const analyzeAnother = document.querySelector("#analyzeAnother");
 const dropzone = document.querySelector(".dropzone");
 const scoreRing = document.querySelector(".score-ring");
+
+let currentResult = null;
+let activeCategory = "all";
 
 const markerIcons = {
   Blood: "bloodtype",
@@ -89,6 +93,7 @@ form.addEventListener("submit", async (event) => {
 });
 
 backToStart.addEventListener("click", () => {
+  currentResult = null;
   startScreen.classList.remove("hidden");
   reportScreen.classList.add("hidden");
   resultNav.classList.add("hidden");
@@ -96,10 +101,13 @@ backToStart.addEventListener("click", () => {
 });
 
 analyzeAnother.addEventListener("click", () => {
+  currentResult = null;
   form.reset();
   fileLabel.textContent = "Choose File";
   scoreValue.textContent = "--";
   scoreRing.style.setProperty("--score", 0);
+  categoryGrid.innerHTML = "";
+  categoryGrid.classList.add("hidden");
   markerGrid.innerHTML = "";
   startScreen.classList.remove("hidden");
   reportScreen.classList.add("hidden");
@@ -115,30 +123,35 @@ function setLoading(isLoading, label = "Analyzing...") {
 }
 
 function showStartError(title, message) {
+  currentResult = null;
   startScreen.classList.add("hidden");
   reportScreen.classList.remove("hidden");
-  resultNav.classList.remove("hidden");
+  resultNav.classList.add("hidden");
   summaryTitle.textContent = title;
   summaryText.textContent = message;
   scoreValue.textContent = "--";
   scoreRing.style.setProperty("--score", 0);
   greatCount.textContent = "0";
   focusCount.textContent = "0";
+  categoryGrid.innerHTML = "";
+  categoryGrid.classList.add("hidden");
   markerGrid.innerHTML = "";
   note.classList.add("hidden");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function renderResult(result) {
+  currentResult = result;
+  activeCategory = "all";
   startScreen.classList.add("hidden");
   reportScreen.classList.remove("hidden");
-  resultNav.classList.remove("hidden");
+  resultNav.classList.add("hidden");
 
   const score = result.score || 0;
   scoreValue.textContent = score || "--";
   scoreRing.style.setProperty("--score", score);
   summaryTitle.textContent = titleForScore(score, result.markers.length);
-  summaryText.textContent = result.ai_summary || result.summary;
+  summaryText.textContent = formatResultSummary(result);
   disclaimer.textContent = result.disclaimer;
   greatCount.textContent = result.counts.great || 0;
   focusCount.textContent = (result.counts.low || 0) + (result.counts.high || 0);
@@ -150,14 +163,94 @@ function renderResult(result) {
     note.classList.add("hidden");
   }
 
-  markerGrid.innerHTML = "";
-  if (!result.markers.length) {
-    markerGrid.appendChild(createEmptyCard());
-  } else {
-    result.markers.forEach((marker) => markerGrid.appendChild(createMarkerCard(marker)));
-  }
+  renderCategoryFilters(result);
+  renderMarkersForCategory("all");
 
   window.scrollTo({ top: 0, behavior: "smooth" });
+  updateResultNav();
+}
+
+window.addEventListener("scroll", updateResultNav, { passive: true });
+window.addEventListener("resize", updateResultNav);
+
+function updateResultNav() {
+  if (reportScreen.classList.contains("hidden") || !currentResult?.markers?.length) {
+    resultNav.classList.add("hidden");
+    return;
+  }
+
+  const footerTop = disclaimer.getBoundingClientRect().top + window.scrollY;
+  const shouldShow = window.scrollY + window.innerHeight >= footerTop - 20;
+  resultNav.classList.toggle("hidden", !shouldShow);
+}
+
+function formatResultSummary(result) {
+  if (!result.markers.length) {
+    return "No recognizable biomarkers were found. Try a text-based PDF, TXT, CSV, or TSV report.";
+  }
+
+  const total = result.markers.length;
+  const sections = result.categories.length;
+  const review = (result.counts.low || 0) + (result.counts.high || 0);
+  const strong = result.counts.great || 0;
+  const inRange = result.counts.ok || 0;
+  const reviewText = review ? `${review} need review` : "no urgent flags";
+  return `Analyzed ${total} biomarkers in ${sections} sections. ${reviewText}; ${strong} look strong; ${inRange} are in range.`;
+}
+
+function renderCategoryFilters(result) {
+  categoryGrid.innerHTML = "";
+  if (!result.markers.length) {
+    categoryGrid.classList.add("hidden");
+    return;
+  }
+
+  categoryGrid.classList.remove("hidden");
+  categoryGrid.appendChild(createCategoryButton("all", "All", result.markers.length, result.score, "monitor_heart"));
+
+  result.categories.forEach((category) => {
+    categoryGrid.appendChild(
+      createCategoryButton(category.name, category.name, category.markers.length, category.score, markerIcons[category.name] || "category")
+    );
+  });
+}
+
+function createCategoryButton(value, label, count, score, icon) {
+  const button = document.createElement("button");
+  button.className = "category-card";
+  button.type = "button";
+  button.dataset.category = value;
+  button.setAttribute("aria-pressed", value === activeCategory ? "true" : "false");
+  button.innerHTML = `
+    <span class="category-icon material-symbols-outlined">${icon}</span>
+    <span class="category-copy">
+      <strong>${escapeHtml(label)}</strong>
+      <small>${count} marker${count === 1 ? "" : "s"} &middot; ${score}/100</small>
+    </span>
+  `;
+  button.addEventListener("click", () => renderMarkersForCategory(value));
+  return button;
+}
+
+function renderMarkersForCategory(categoryName) {
+  activeCategory = categoryName;
+  categoryGrid.querySelectorAll(".category-card").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.category === activeCategory ? "true" : "false");
+  });
+
+  markerGrid.innerHTML = "";
+  if (!currentResult?.markers?.length) {
+    markerGrid.appendChild(createEmptyCard());
+    return;
+  }
+
+  const markers =
+    categoryName === "all"
+      ? currentResult.markers
+      : currentResult.markers.filter((marker) => marker.category === categoryName);
+
+  markers.forEach((marker) => markerGrid.appendChild(createMarkerCard(marker)));
+  updateResultNav();
 }
 
 function createMarkerCard(marker) {

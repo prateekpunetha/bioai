@@ -542,6 +542,83 @@ button:active {
   font-weight: 700;
 }
 
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.category-card {
+  display: flex;
+  min-height: 86px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 2px solid var(--outline-variant);
+  border-bottom: 6px solid #d3b8c4;
+  border-radius: 22px;
+  background: var(--surface-lowest);
+  color: var(--text);
+  text-align: left;
+  box-shadow: none;
+}
+
+.category-card:hover {
+  background: var(--surface-low);
+}
+
+.category-card[aria-pressed="true"] {
+  border-color: var(--primary);
+  border-bottom-color: var(--primary-depth);
+  background: var(--primary-soft);
+}
+
+.category-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-container);
+  color: var(--primary);
+  font-size: 24px;
+}
+
+.category-card[aria-pressed="true"] .category-icon {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.category-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.category-copy strong,
+.category-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-copy strong {
+  color: var(--text);
+  font-family: Lexend, sans-serif;
+  font-size: 0.98rem;
+  font-weight: 900;
+}
+
+.category-copy small {
+  color: var(--text-soft);
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .marker-grid {
   display: grid;
   gap: 28px;
@@ -805,12 +882,25 @@ button:active {
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(12px);
+  animation: navPop 0.22s ease both;
 }
 
 @keyframes riseIn {
   from {
     opacity: 0;
     transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes navPop {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
   }
 
   to {
@@ -882,6 +972,10 @@ button:active {
 
   .marker-card {
     padding: 20px;
+  }
+
+  .category-grid {
+    grid-template-columns: 1fr;
   }
 
   .marker-top {
