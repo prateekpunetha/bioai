@@ -3,6 +3,13 @@ const fileInput = document.querySelector("#reportFile");
 const loadSample = document.querySelector("#loadSample");
 const markerGrid = document.querySelector("#markerGrid");
 const categoryGrid = document.querySelector("#categoryGrid");
+const aiReview = document.querySelector("#aiReview");
+const aiReviewTitle = document.querySelector("#aiReviewTitle");
+const aiSummaryText = document.querySelector("#aiSummaryText");
+const aiInsightGrid = document.querySelector("#aiInsightGrid");
+const detailsPanel = document.querySelector("#detailsPanel");
+const detailsTitle = document.querySelector("#detailsTitle");
+const closeDetails = document.querySelector("#closeDetails");
 const summaryTitle = document.querySelector("#summaryTitle");
 const summaryText = document.querySelector("#summaryText");
 const scoreValue = document.querySelector("#scoreValue");
@@ -20,7 +27,7 @@ const dropzone = document.querySelector(".dropzone");
 const scoreRing = document.querySelector(".score-ring");
 
 let currentResult = null;
-let activeCategory = "all";
+let activeCategory = "";
 
 const markerIcons = {
   Blood: "bloodtype",
@@ -108,11 +115,26 @@ analyzeAnother.addEventListener("click", () => {
   scoreRing.style.setProperty("--score", 0);
   categoryGrid.innerHTML = "";
   categoryGrid.classList.add("hidden");
+  aiReview.classList.add("hidden");
+  aiSummaryText.textContent = "";
+  aiInsightGrid.innerHTML = "";
+  detailsPanel.classList.add("hidden");
+  detailsTitle.textContent = "Select a category";
   markerGrid.innerHTML = "";
   startScreen.classList.remove("hidden");
   reportScreen.classList.add("hidden");
   resultNav.classList.add("hidden");
   window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+closeDetails.addEventListener("click", () => {
+  activeCategory = "";
+  detailsPanel.classList.add("hidden");
+  markerGrid.innerHTML = "";
+  categoryGrid.querySelectorAll(".category-card").forEach((button) => {
+    button.setAttribute("aria-pressed", "false");
+  });
+  updateResultNav();
 });
 
 function setLoading(isLoading, label = "Analyzing...") {
@@ -135,6 +157,11 @@ function showStartError(title, message) {
   focusCount.textContent = "0";
   categoryGrid.innerHTML = "";
   categoryGrid.classList.add("hidden");
+  aiReview.classList.add("hidden");
+  aiSummaryText.textContent = "";
+  aiInsightGrid.innerHTML = "";
+  detailsPanel.classList.add("hidden");
+  detailsTitle.textContent = "Select a category";
   markerGrid.innerHTML = "";
   note.classList.add("hidden");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -142,7 +169,7 @@ function showStartError(title, message) {
 
 function renderResult(result) {
   currentResult = result;
-  activeCategory = "all";
+  activeCategory = "";
   startScreen.classList.add("hidden");
   reportScreen.classList.remove("hidden");
   resultNav.classList.add("hidden");
@@ -163,7 +190,10 @@ function renderResult(result) {
   }
 
   renderCategoryFilters(result);
-  renderMarkersForCategory("all");
+  renderAiReview(result);
+  detailsPanel.classList.add("hidden");
+  detailsTitle.textContent = "Select a category";
+  markerGrid.innerHTML = "";
 
   window.scrollTo({ top: 0, behavior: "smooth" });
   updateResultNav();
@@ -223,6 +253,106 @@ function formatResultSummary(result) {
   return `Analyzed ${total} biomarkers in ${sections} sections. ${reviewText}; ${strong} look strong; ${inRange} are in range.`;
 }
 
+function renderAiReview(result) {
+  aiInsightGrid.innerHTML = "";
+  if (!result.markers.length) {
+    aiReview.classList.add("hidden");
+    return;
+  }
+
+  aiReview.classList.remove("hidden");
+  const analysis = normalizeAiAnalysis(result);
+  aiReviewTitle.textContent = analysis.isAi ? "Gemini Analysis" : "Gemini Error";
+  aiSummaryText.textContent = analysis.summary;
+
+  addInsightSection("Review First", analysis.reviewFirst, "priority_high");
+  addInsightSection("Patterns", analysis.patterns, "hub");
+  addInsightSection("Suggested Next Steps", analysis.nextSteps, "checklist");
+  addInsightSection("Ask Your Clinician", analysis.questions, "help");
+}
+
+function normalizeAiAnalysis(result) {
+  const ai = result.ai_analysis || {};
+  const hasUsefulAi = result.ai_enabled && typeof ai.summary === "string" && ai.summary.trim().length >= 80;
+  if (hasUsefulAi) {
+    return {
+      isAi: true,
+      summary: ai.summary.trim(),
+      reviewFirst: normalizeAiReviewItems(ai.review_first),
+      patterns: normalizeTextItems(ai.patterns),
+      nextSteps: normalizeTextItems(ai.next_steps),
+      questions: normalizeTextItems(ai.clinician_questions),
+    };
+  }
+
+  return {
+    isAi: false,
+    summary: result.ai_error || "Gemini did not return an analysis. Check GEMINI_API_KEY / GOOGLE_API_KEY, model name, network access, and API key restrictions.",
+    reviewFirst: [],
+    patterns: [],
+    nextSteps: [],
+    questions: [],
+  };
+}
+
+function addInsightSection(title, items, icon) {
+  if (!items.length) return;
+  const section = document.createElement("section");
+  section.className = "ai-insight-section";
+  const rows = items
+    .map((item) => {
+      const titleText = typeof item === "string" ? item : item.title;
+      const bodyText = typeof item === "string" ? "" : item.body;
+      return `
+        <div class="ai-insight-item">
+          <span class="ai-focus-badge">${escapeHtml(initialsFromText(titleText))}</span>
+          <div>
+            <strong>${escapeHtml(titleText)}</strong>
+            ${bodyText ? `<small>${escapeHtml(bodyText)}</small>` : ""}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+  section.innerHTML = `
+    <h3><span class="material-symbols-outlined">${icon}</span>${escapeHtml(title)}</h3>
+    <div class="ai-insight-list">${rows}</div>
+  `;
+  aiInsightGrid.appendChild(section);
+}
+
+function normalizeAiReviewItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => ({
+      title: String(item.marker || "Review marker").trim(),
+      body: [item.reason, item.suggestion].filter(Boolean).join(" "),
+    }))
+    .filter((item) => item.title || item.body)
+    .slice(0, 4);
+}
+
+function normalizeTextItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => String(item).trim()).filter(Boolean).slice(0, 4);
+}
+
+function initialsFromText(text) {
+  return String(text)
+    .replace(/[^a-zA-Z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0].toUpperCase())
+    .join("");
+}
+
+function joinHuman(items) {
+  if (items.length <= 1) return items[0] || "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
 function renderCategoryFilters(result) {
   categoryGrid.innerHTML = "";
   if (!result.markers.length) {
@@ -231,7 +361,6 @@ function renderCategoryFilters(result) {
   }
 
   categoryGrid.classList.remove("hidden");
-  categoryGrid.appendChild(createCategoryButton("all", "All", result.markers.length, result.score, "monitor_heart"));
 
   result.categories.forEach((category) => {
     categoryGrid.appendChild(
@@ -250,7 +379,7 @@ function createCategoryButton(value, label, count, score, icon) {
     <span class="category-icon material-symbols-outlined">${icon}</span>
     <span class="category-copy">
       <strong>${escapeHtml(label)}</strong>
-      <small>${count} marker${count === 1 ? "" : "s"} &middot; ${score}/100</small>
+      <small>${count} marker${count === 1 ? "" : "s"} &middot; ${score}/100 &middot; tap to view</small>
     </span>
   `;
   button.addEventListener("click", () => renderMarkersForCategory(value));
@@ -270,11 +399,12 @@ function renderMarkersForCategory(categoryName) {
   }
 
   const markers =
-    categoryName === "all"
-      ? currentResult.markers
-      : currentResult.markers.filter((marker) => marker.category === categoryName);
+    currentResult.markers.filter((marker) => marker.category === categoryName);
 
+  detailsTitle.textContent = `${categoryName} Markers`;
+  detailsPanel.classList.remove("hidden");
   markers.forEach((marker) => markerGrid.appendChild(createMarkerCard(marker)));
+  detailsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   updateResultNav();
 }
 

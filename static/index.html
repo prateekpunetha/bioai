@@ -98,7 +98,29 @@
         </section>
 
         <div id="note" class="note hidden"></div>
+        <section id="aiReview" class="ai-review hidden" aria-label="BioAI summary">
+          <div class="ai-review-head">
+            <span class="ai-review-icon material-symbols-outlined">auto_awesome</span>
+            <div>
+              <p class="report-kicker">BioAI Summary</p>
+              <h2 id="aiReviewTitle">AI Analysis</h2>
+            </div>
+          </div>
+          <p id="aiSummaryText"></p>
+          <div id="aiInsightGrid" class="ai-insight-grid"></div>
+        </section>
         <div id="categoryGrid" class="category-grid hidden" aria-label="Filter biomarkers by category"></div>
+        <section id="detailsPanel" class="details-panel hidden" aria-live="polite">
+          <div class="details-head">
+            <div>
+              <p class="report-kicker">Detailed Markers</p>
+              <h2 id="detailsTitle">Select a category</h2>
+            </div>
+            <button id="closeDetails" class="icon-button" type="button" aria-label="Close details">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        </section>
         <div id="markerGrid" class="marker-grid"></div>
         <p class="disclaimer" id="disclaimer">Educational only. This is not medical diagnosis.</p>
       </section>

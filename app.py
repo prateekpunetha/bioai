@@ -8,7 +8,7 @@ import tempfile
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -720,7 +720,7 @@ def message(value: float, marker: dict) -> str:
 
 def analyze_report(text: str, note: str | None = None) -> dict:
     # Main analyzer. No black box here: parse values, compare to our ranges,
-    # group the results, then optionally ask AI to write a nicer summary.
+    # group the results, then ask Gemini to write a safer consumer summary when configured.
     markers = [found for marker in BIOMARKERS if (found := find_marker(text, marker))]
     markers = sorted(markers, key=lambda item: (item["category"], status_rank(item["status"]), item["name"]))
     status_counts = {name: sum(1 for item in markers if item["status"] == name) for name in ["great", "ok", "low", "high"]}
@@ -738,14 +738,17 @@ def analyze_report(text: str, note: str | None = None) -> dict:
     else:
         summary = f"Found {len(markers)} biomarkers across {len(categories)} sections. Score {average}/100 is {score_label(average)} with no obvious out-of-range values."
 
-    ai_summary = generate_ai_summary(markers, summary)
+    ai_analysis, ai_error = generate_ai_analysis(markers, categories, summary)
 
     return {
         "id": str(uuid.uuid4())[:8],
         "score": average,
         "summary": summary,
-        "ai_summary": ai_summary,
-        "ai_enabled": bool(os.environ.get("OPENAI_API_KEY")),
+        "ai_summary": ai_analysis.get("summary") if ai_analysis else None,
+        "ai_analysis": ai_analysis,
+        "ai_enabled": bool(os.environ.get("GEMINI_API_KEY")),
+        "ai_provider": "gemini",
+        "ai_error": ai_error,
         "markers": markers,
         "categories": categories,
         "focus": focus[:6],
@@ -793,43 +796,107 @@ def build_categories(markers: list[dict]) -> list[dict]:
     return sorted(categories, key=lambda item: (item["focus_count"] == 0, -item["focus_count"], item["name"]))
 
 
-def generate_ai_summary(markers: list[dict], fallback: str) -> str | None:
-    # Optional polish layer. If OPENAI_API_KEY is missing or the API fails, the
-    # app still works with the rule-based summary.
-    api_key = os.environ.get("OPENAI_API_KEY")
+def generate_ai_analysis(markers: list[dict], categories: list[dict], fallback: str) -> tuple[dict | None, str | None]:
+    # Gemini polish layer. If GEMINI_API_KEY is missing or the API fails, the
+    # UI reports that Gemini is not configured instead of pretending AI ran.
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key or not markers:
-        return None
+        return None, "GEMINI_API_KEY or GOOGLE_API_KEY is not configured." if markers else None
 
-    model = os.environ.get("OPENAI_MODEL", "gpt-5")
+    model = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
     compact_markers = [
         {
             "name": item["name"],
             "value": item["value"],
             "unit": item["unit"],
+            "category": item["category"],
             "status": item["status"],
             "message": item["message"],
             "tips": item["tips"][:2],
         }
         for item in markers
     ]
+    compact_categories = [
+        {
+            "name": item["name"],
+            "score": item["score"],
+            "focus_count": item["focus_count"],
+        }
+        for item in categories
+    ]
     prompt = (
-        "Write a warm, concise blood report summary for a consumer wellness app. "
-        "Do not diagnose. Praise strong values, mention focus areas, and suggest safe lifestyle next steps. "
-        "Keep it under 90 words.\n\n"
-        + json.dumps({"fallback_summary": fallback, "markers": compact_markers})
+        "You are BioAI, a blood report explainer. Analyze the parsed report for a consumer. "
+        "Do not diagnose, do not claim certainty, and do not prescribe treatment. "
+        "Return ONLY valid JSON, with no markdown. Use this exact shape: "
+        '{"summary":"2-3 sentence overall interpretation","patterns":["pattern insight"],'
+        '"review_first":[{"marker":"name","reason":"why it matters","suggestion":"safe next step"}],'
+        '"next_steps":["safe step"],"clinician_questions":["question"]}. '
+        "Name the main low/high markers. Explain relationships or patterns across categories when possible. "
+        "Keep summary under 70 words. Keep each array to 2-3 items. Keep each string under 120 characters. Use plain English. "
+        "Every suggestion must be educational and safe, not a diagnosis or prescription.\n\n"
+        + json.dumps({"fallback_summary": fallback, "categories": compact_categories, "markers": compact_markers})
     )
+
+    sdk_analysis, sdk_error = generate_ai_analysis_with_sdk(api_key, model, prompt)
+    if sdk_analysis:
+        return sdk_analysis, None
+    rest_analysis, rest_error = generate_ai_analysis_with_rest(api_key, model, prompt)
+    if rest_analysis:
+        return rest_analysis, None
+    return None, rest_error or sdk_error or "Gemini returned no usable analysis."
+
+
+def generate_ai_analysis_with_sdk(api_key: str, model: str, prompt: str) -> tuple[dict | None, str | None]:
+    try:
+        from google import genai  # type: ignore
+        from google.genai import types  # type: ignore
+    except Exception as error:
+        return None, f"google-genai SDK unavailable: {error}"
+
+    try:
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.35,
+                max_output_tokens=1600,
+                response_mime_type="application/json",
+            ),
+        )
+    except Exception as error:
+        return None, f"Gemini SDK request failed: {error}"
+
+    text = getattr(response, "text", None)
+    if isinstance(text, str) and text.strip():
+        analysis = parse_ai_analysis(text)
+        if analysis:
+            return analysis, None
+        return None, f"Gemini SDK returned invalid JSON: {text[:300]}"
+    return None, "Gemini SDK returned no text."
+
+
+def generate_ai_analysis_with_rest(api_key: str, model: str, prompt: str) -> tuple[dict | None, str | None]:
     payload = json.dumps(
         {
-            "model": model,
-            "input": prompt,
-            "max_output_tokens": 220,
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": prompt}],
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.35,
+                "maxOutputTokens": 1600,
+                "responseMimeType": "application/json",
+            },
         }
     ).encode("utf-8")
     request = Request(
-        "https://api.openai.com/v1/responses",
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         data=payload,
         headers={
-            "Authorization": f"Bearer {api_key}",
+            "x-goog-api-key": api_key,
             "Content-Type": "application/json",
         },
         method="POST",
@@ -838,18 +905,90 @@ def generate_ai_summary(markers: list[dict], fallback: str) -> str | None:
     try:
         with urlopen(request, timeout=12) as response:
             data = json.loads(response.read().decode("utf-8"))
-    except (OSError, URLError, TimeoutError, json.JSONDecodeError):
+    except HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")[:500]
+        return None, f"Gemini HTTP {error.code}: {detail}"
+    except (OSError, URLError, TimeoutError, json.JSONDecodeError) as error:
+        return None, f"Gemini request failed: {error}"
+
+    for candidate in data.get("candidates", []):
+        content = candidate.get("content", {})
+        for part in content.get("parts", []):
+            text = part.get("text")
+            if isinstance(text, str) and text.strip():
+                analysis = parse_ai_analysis(text)
+                if analysis:
+                    return analysis, None
+                return None, f"Gemini returned invalid JSON: {text[:300]}"
+    return None, "Gemini returned no usable text."
+
+
+def parse_ai_analysis(text: str) -> dict | None:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
         return None
 
-    text = data.get("output_text")
-    if isinstance(text, str) and text.strip():
-        return text.strip()
+    return {
+        "summary": str(data.get("summary", "")).strip(),
+        "patterns": normalize_string_list(data.get("patterns")),
+        "review_first": normalize_review_items(data.get("review_first")),
+        "next_steps": normalize_string_list(data.get("next_steps")),
+        "clinician_questions": normalize_string_list(data.get("clinician_questions")),
+    }
 
-    for output in data.get("output", []):
-        for content in output.get("content", []):
-            if content.get("type") == "output_text" and content.get("text"):
-                return content["text"].strip()
-    return None
+
+def normalize_string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()][:4]
+
+
+def normalize_review_items(value: object) -> list[dict]:
+    if not isinstance(value, list):
+        return []
+    items = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        marker = str(item.get("marker", "")).strip()
+        reason = str(item.get("reason", "")).strip()
+        suggestion = str(item.get("suggestion", "")).strip()
+        if marker or reason or suggestion:
+            items.append({"marker": marker, "reason": reason, "suggestion": suggestion})
+    return items[:4]
+
+
+def check_ai_health() -> dict:
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    model = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
+    if not api_key:
+        return {
+            "ok": False,
+            "provider": "gemini",
+            "model": model,
+            "error": "GEMINI_API_KEY or GOOGLE_API_KEY is not configured.",
+        }
+
+    prompt = 'Return only this JSON: {"ok":true,"message":"Gemini is connected"}'
+    analysis, error = generate_ai_analysis_with_sdk(api_key, model, prompt)
+    if analysis:
+        return {"ok": True, "provider": "gemini", "model": model, "method": "sdk"}
+
+    analysis, rest_error = generate_ai_analysis_with_rest(api_key, model, prompt)
+    if analysis:
+        return {"ok": True, "provider": "gemini", "model": model, "method": "rest"}
+
+    return {
+        "ok": False,
+        "provider": "gemini",
+        "model": model,
+        "error": rest_error or error or "Gemini test failed.",
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -874,6 +1013,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/sample":
             result, status = analyze_sample_report()
             self.send_json(result, status)
+            return
+
+        if path == "/api/ai-health":
+            self.send_json(check_ai_health())
             return
 
         if path != "/api/analyze":
