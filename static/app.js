@@ -9,19 +9,38 @@ const greatCount = document.querySelector("#greatCount");
 const focusCount = document.querySelector("#focusCount");
 const disclaimer = document.querySelector("#disclaimer");
 const note = document.querySelector("#note");
+const fileLabel = document.querySelector("#fileLabel");
+const startScreen = document.querySelector("#startScreen");
+const reportScreen = document.querySelector("#reportScreen");
+const resultNav = document.querySelector("#resultNav");
+const backToStart = document.querySelector("#backToStart");
+const analyzeAnother = document.querySelector("#analyzeAnother");
+const dropzone = document.querySelector(".dropzone");
+const scoreRing = document.querySelector(".score-ring");
+
+const markerIcons = {
+  Blood: "bloodtype",
+  Electrolytes: "water_drop",
+  Hormones: "fitness_center",
+  Inflammation: "local_fire_department",
+  Iron: "hardware",
+  Kidney: "health_and_safety",
+  Lipids: "favorite",
+  Liver: "science",
+  Metabolic: "monitor_heart",
+  Vitamins: "wb_sunny",
+};
 
 loadSample.addEventListener("click", async () => {
-  setLoading(true, "Loading sample...");
+  setLoading(true, "Loading Sample...");
   try {
     const response = await fetch("/api/sample", { method: "POST" });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Could not load sample PDF.");
     renderResult(result);
-    const label = document.querySelector(".dropzone strong");
-    label.textContent = result.sample_file || "Sample PDF";
+    fileLabel.textContent = result.sample_file || "Sample PDF";
   } catch (error) {
-    summaryTitle.textContent = "Sample failed";
-    summaryText.textContent = error.message;
+    showStartError("Sample failed", error.message);
   } finally {
     setLoading(false);
   }
@@ -29,15 +48,25 @@ loadSample.addEventListener("click", async () => {
 
 fileInput.addEventListener("change", () => {
   const file = fileInput.files[0];
-  const label = document.querySelector(".dropzone strong");
-  label.textContent = file ? file.name : "Drop a report or choose file";
+  fileLabel.textContent = file ? file.name : "Choose File";
+});
+
+dropzone.addEventListener("dragover", (event) => {
+  event.preventDefault();
+});
+
+dropzone.addEventListener("drop", (event) => {
+  event.preventDefault();
+  const file = event.dataTransfer.files[0];
+  if (!file) return;
+  fileInput.files = event.dataTransfer.files;
+  fileLabel.textContent = file.name;
 });
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!fileInput.files.length) {
-    summaryTitle.textContent = "Choose a report first";
-    summaryText.textContent = "Upload a PDF, TXT, CSV, or TSV file, or use the sample report.";
+    showStartError("Choose a report first", "Upload a PDF, TXT, CSV, or TSV file, or use the sample report.");
     return;
   }
 
@@ -53,23 +82,62 @@ form.addEventListener("submit", async (event) => {
     if (!response.ok) throw new Error(result.error || "Could not analyze report.");
     renderResult(result);
   } catch (error) {
-    summaryTitle.textContent = "Analysis failed";
-    summaryText.textContent = error.message;
+    showStartError("Analysis failed", error.message);
   } finally {
     setLoading(false);
   }
+});
+
+backToStart.addEventListener("click", () => {
+  startScreen.classList.remove("hidden");
+  reportScreen.classList.add("hidden");
+  resultNav.classList.add("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+analyzeAnother.addEventListener("click", () => {
+  form.reset();
+  fileLabel.textContent = "Choose File";
+  scoreValue.textContent = "--";
+  scoreRing.style.setProperty("--score", 0);
+  markerGrid.innerHTML = "";
+  startScreen.classList.remove("hidden");
+  reportScreen.classList.add("hidden");
+  resultNav.classList.add("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
 function setLoading(isLoading, label = "Analyzing...") {
   const button = form.querySelector(".primary");
   button.disabled = isLoading;
   loadSample.disabled = isLoading;
-  button.textContent = isLoading ? label : "Analyze report";
+  button.textContent = isLoading ? label : "Analyze Report";
+}
+
+function showStartError(title, message) {
+  startScreen.classList.add("hidden");
+  reportScreen.classList.remove("hidden");
+  resultNav.classList.remove("hidden");
+  summaryTitle.textContent = title;
+  summaryText.textContent = message;
+  scoreValue.textContent = "--";
+  scoreRing.style.setProperty("--score", 0);
+  greatCount.textContent = "0";
+  focusCount.textContent = "0";
+  markerGrid.innerHTML = "";
+  note.classList.add("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function renderResult(result) {
-  scoreValue.textContent = result.score || "--";
-  summaryTitle.textContent = result.markers.length ? `Report score: ${result.score}/100` : "No biomarkers found yet";
+  startScreen.classList.add("hidden");
+  reportScreen.classList.remove("hidden");
+  resultNav.classList.remove("hidden");
+
+  const score = result.score || 0;
+  scoreValue.textContent = score || "--";
+  scoreRing.style.setProperty("--score", score);
+  summaryTitle.textContent = titleForScore(score, result.markers.length);
   summaryText.textContent = result.ai_summary || result.summary;
   disclaimer.textContent = result.disclaimer;
   greatCount.textContent = result.counts.great || 0;
@@ -83,101 +151,153 @@ function renderResult(result) {
   }
 
   markerGrid.innerHTML = "";
-  if (result.focus?.length) markerGrid.appendChild(createPrioritySection("Review first", result.focus));
-  if (result.wins?.length) markerGrid.appendChild(createPrioritySection("Looking good", result.wins));
-  result.categories.forEach((category) => markerGrid.appendChild(createCategorySection(category)));
-}
+  if (!result.markers.length) {
+    markerGrid.appendChild(createEmptyCard());
+  } else {
+    result.markers.forEach((marker) => markerGrid.appendChild(createMarkerCard(marker)));
+  }
 
-function createPrioritySection(title, markers) {
-  const section = document.createElement("section");
-  section.className = "report-section priority-section";
-  const rows = markers.map(createMarkerRow).join("");
-  section.innerHTML = `
-    <div class="section-head">
-      <div>
-        <p class="eyebrow">${escapeHtml(title)}</p>
-        <h3>${title === "Review first" ? "Values that need attention" : "Strong markers to keep doing"}</h3>
-      </div>
-      <span class="section-count">${markers.length}</span>
-    </div>
-    <div class="marker-list">${rows}</div>
-  `;
-  return section;
-}
-
-function createCategorySection(category) {
-  const section = document.createElement("section");
-  section.className = "report-section";
-  const rows = category.markers.map(createMarkerRow).join("");
-  section.innerHTML = `
-    <div class="section-head">
-      <div>
-        <p class="eyebrow">${escapeHtml(category.name)}</p>
-        <h3>${escapeHtml(category.label)} section</h3>
-      </div>
-      <div class="section-score">${category.score}<small>/100</small></div>
-    </div>
-    <div class="marker-list">${rows}</div>
-  `;
-  return section;
-}
-
-function createMarkerRow(marker) {
-  const tips = marker.tips.slice(0, 2).map((tip) => `<li>${escapeHtml(tip)}</li>`).join("");
-  return `
-    <article class="marker-row">
-      <div class="marker-main">
-        <div class="marker-title">
-          <h4>${escapeHtml(marker.name)}</h4>
-          <span class="status-pill ${marker.status}">${labelForStatus(marker.status)}</span>
-        </div>
-        <p class="about"><b>What it is:</b> ${escapeHtml(marker.about || "Read this marker with nearby results and your lab range.")}</p>
-        <p>${escapeHtml(marker.message)}</p>
-        <ul class="tips">${tips}</ul>
-      </div>
-      <div class="marker-metric">
-        <div class="value-row">
-          <span class="value">${formatNumber(marker.value)}</span>
-          <span class="unit">${escapeHtml(marker.unit)}</span>
-        </div>
-        <div class="range-text">Ref ${formatNumber(marker.range.low)}-${formatNumber(marker.range.high)}</div>
-        <div class="bar" aria-hidden="true">
-          <div class="fill" style="--score: ${marker.score}%"></div>
-        </div>
-        <div class="range-text">Score ${marker.score}/100</div>
-      </div>
-    </article>
-  `;
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function createMarkerCard(marker) {
   const card = document.createElement("article");
+  const tone = toneForMarker(marker);
+  const position = markerPosition(marker);
+  const optimal = optimalRangePosition(marker);
+  const tips = marker.tips.slice(0, 2).map((tip) => `<li>${escapeHtml(tip)}</li>`).join("");
+
   card.className = "marker-card";
+  card.dataset.tone = tone;
+  card.style.setProperty("--marker-position", `${position}%`);
+  card.style.setProperty("--opt-start", `${optimal.start}%`);
+  card.style.setProperty("--opt-width", `${optimal.width}%`);
 
   card.innerHTML = `
     <div class="marker-top">
-      <div>
-        <div class="category">${escapeHtml(marker.category)}</div>
-        <h3 class="marker-name">${escapeHtml(marker.name)}</h3>
+      <div class="marker-heading">
+        <span class="marker-icon">
+          <span class="material-symbols-outlined">${iconForMarker(marker)}</span>
+        </span>
+        <div class="marker-title">
+          <div class="marker-category">${escapeHtml(marker.category)}</div>
+          <h2>${escapeHtml(marker.name)}</h2>
+        </div>
       </div>
       <span class="status-pill ${marker.status}">${labelForStatus(marker.status)}</span>
     </div>
-    <div class="value-row">
-      <span class="value">${formatNumber(marker.value)}</span>
-      <span class="unit">${escapeHtml(marker.unit)}</span>
+
+    <div>
+      <div class="value-row">
+        <span class="value">${formatNumber(marker.value)}</span>
+        <span class="unit">${escapeHtml(marker.unit)}</span>
+      </div>
+      <div class="range-bar" aria-label="${escapeHtml(marker.name)} score ${marker.score} out of 100">
+        <span class="range-fill"></span>
+        <span class="range-optimal"></span>
+        <span class="range-dot"></span>
+      </div>
+      <div class="range-labels">
+        <span>Ref ${formatNumber(marker.range.low)}</span>
+        <span>Score ${marker.score}/100</span>
+        <span>${formatNumber(marker.range.high)}</span>
+      </div>
+    </div>
+
+    <div class="marker-info">
+      <h3><span class="material-symbols-outlined">info</span> What is this?</h3>
+      <p>${escapeHtml(marker.about || marker.message)}</p>
+    </div>
+
+    <ul class="marker-tips">${tips}</ul>
+  `;
+
+  return card;
+}
+
+function createEmptyCard() {
+  const card = document.createElement("article");
+  card.className = "marker-card";
+  card.dataset.tone = "gold";
+  card.innerHTML = `
+    <div class="marker-top">
+      <div class="marker-heading">
+        <span class="marker-icon">
+          <span class="material-symbols-outlined">search</span>
+        </span>
+        <div class="marker-title">
+          <div class="marker-category">No markers found</div>
+          <h2>Try a clearer report</h2>
+        </div>
+      </div>
+    </div>
+    <div class="marker-info">
+      <h3><span class="material-symbols-outlined">info</span> What happened?</h3>
+      <p>The app needs readable report text. If the PDF is scanned as an image, run OCR first or upload a text/CSV version.</p>
     </div>
   `;
   return card;
 }
 
+function titleForScore(score, markerCount) {
+  if (!markerCount) return "Report Analysis";
+  if (score >= 85) return "Strong Report";
+  if (score >= 70) return "Good Report";
+  if (score >= 50) return "Needs Review";
+  return "Review First";
+}
+
+function toneForMarker(marker) {
+  if (marker.status === "low" || marker.status === "high") return "gold";
+  if (marker.status === "great") {
+    return marker.category === "Vitamins" || marker.category === "Iron" ? "gold" : "mint";
+  }
+  if (marker.category === "Lipids" || marker.category === "Blood") return "mint";
+  return "pink";
+}
+
+function iconForMarker(marker) {
+  return markerIcons[marker.category] || "monitor_heart";
+}
+
+function markerPosition(marker) {
+  const low = Number(marker.range.low);
+  const high = Number(marker.range.high);
+  const value = Number(marker.value);
+  const span = Math.max(high - low, 1);
+  const paddedLow = low - span * 0.25;
+  const paddedHigh = high + span * 0.25;
+  return clamp(((value - paddedLow) / (paddedHigh - paddedLow)) * 100, 4, 96);
+}
+
+function optimalRangePosition(marker) {
+  const low = Number(marker.range.low);
+  const high = Number(marker.range.high);
+  const optLow = Number(marker.optimal?.low ?? low);
+  const optHigh = Number(marker.optimal?.high ?? high);
+  const span = Math.max(high - low, 1);
+  const paddedLow = low - span * 0.25;
+  const paddedHigh = high + span * 0.25;
+  const start = clamp(((optLow - paddedLow) / (paddedHigh - paddedLow)) * 100, 0, 100);
+  const end = clamp(((optHigh - paddedLow) / (paddedHigh - paddedLow)) * 100, 0, 100);
+  return { start, width: Math.max(end - start, 8) };
+}
+
 function labelForStatus(status) {
-  if (status === "great") return "great";
-  if (status === "ok") return "in range";
+  if (status === "great") return "Great";
+  if (status === "ok") return "In Range";
+  if (status === "low") return "Low";
+  if (status === "high") return "High";
   return status;
 }
 
 function formatNumber(value) {
-  return Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(/\.0$/, "");
+  const number = Number(value);
+  return Number.isInteger(number) ? number.toString() : number.toFixed(1).replace(/\.0$/, "");
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function escapeHtml(value) {
