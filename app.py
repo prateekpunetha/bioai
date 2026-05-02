@@ -720,7 +720,7 @@ def message(value: float, marker: dict) -> str:
 
 def analyze_report(text: str, note: str | None = None) -> dict:
     # Main analyzer. No black box here: parse values, compare to our ranges,
-    # group the results, then ask Gemini to write a safer consumer summary when configured.
+    # and group the results. Gemini runs separately so first render is fast.
     markers = [found for marker in BIOMARKERS if (found := find_marker(text, marker))]
     markers = sorted(markers, key=lambda item: (item["category"], status_rank(item["status"]), item["name"]))
     status_counts = {name: sum(1 for item in markers if item["status"] == name) for name in ["great", "ok", "low", "high"]}
@@ -738,17 +738,18 @@ def analyze_report(text: str, note: str | None = None) -> dict:
     else:
         summary = f"Found {len(markers)} biomarkers across {len(categories)} sections. Score {average}/100 is {score_label(average)} with no obvious out-of-range values."
 
-    ai_analysis, ai_error = generate_ai_analysis(markers, categories, summary)
+    ai_enabled = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
 
     return {
         "id": str(uuid.uuid4())[:8],
         "score": average,
         "summary": summary,
-        "ai_summary": ai_analysis.get("summary") if ai_analysis else None,
-        "ai_analysis": ai_analysis,
-        "ai_enabled": bool(os.environ.get("GEMINI_API_KEY")),
+        "ai_summary": None,
+        "ai_analysis": None,
+        "ai_enabled": ai_enabled,
         "ai_provider": "gemini",
-        "ai_error": ai_error,
+        "ai_error": None if ai_enabled else "GEMINI_API_KEY or GOOGLE_API_KEY is not configured.",
+        "ai_pending": bool(ai_enabled and markers),
         "markers": markers,
         "categories": categories,
         "focus": focus[:6],
@@ -794,6 +795,23 @@ def build_categories(markers: list[dict]) -> list[dict]:
             }
         )
     return sorted(categories, key=lambda item: (item["focus_count"] == 0, -item["focus_count"], item["name"]))
+
+
+def analyze_with_gemini_payload(payload: dict) -> dict:
+    markers = payload.get("markers") if isinstance(payload.get("markers"), list) else []
+    categories = payload.get("categories") if isinstance(payload.get("categories"), list) else []
+    summary = str(payload.get("summary") or "")
+    ai_enabled = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+    ai_analysis, ai_error = generate_ai_analysis(markers, categories, summary)
+    return {
+        "id": payload.get("id"),
+        "ai_enabled": ai_enabled,
+        "ai_provider": "gemini",
+        "ai_pending": False,
+        "ai_summary": ai_analysis.get("summary") if ai_analysis else None,
+        "ai_analysis": ai_analysis,
+        "ai_error": ai_error,
+    }
 
 
 def generate_ai_analysis(markers: list[dict], categories: list[dict], fallback: str) -> tuple[dict | None, str | None]:
@@ -1017,6 +1035,20 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/ai-health":
             self.send_json(check_ai_health())
+            return
+
+        if path == "/api/ai-analysis":
+            length = int(self.headers.get("content-length", "0"))
+            if length > MAX_UPLOAD_BYTES:
+                upload_mb = MAX_UPLOAD_BYTES // 1024 // 1024
+                self.send_json({"error": f"Request is too large. Keep it under {upload_mb} MB."}, 413)
+                return
+            try:
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            except json.JSONDecodeError:
+                self.send_json({"error": "Invalid JSON payload."}, 400)
+                return
+            self.send_json(analyze_with_gemini_payload(payload))
             return
 
         if path != "/api/analyze":

@@ -107,8 +107,13 @@
             </div>
           </div>
           <p id="aiSummaryText"></p>
-          <div id="aiInsightGrid" class="ai-insight-grid"></div>
+          <button id="toggleAiDetails" class="ai-toggle hidden" type="button">Show full analysis</button>
+          <div id="aiInsightGrid" class="ai-insight-grid hidden"></div>
         </section>
+        <div class="section-label">
+          <p class="report-kicker">Explore Details</p>
+          <h2>Choose a category</h2>
+        </div>
         <div id="categoryGrid" class="category-grid hidden" aria-label="Filter biomarkers by category"></div>
         <section id="detailsPanel" class="details-panel hidden" aria-live="polite">
           <div class="details-head">

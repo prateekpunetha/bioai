@@ -7,6 +7,7 @@ const aiReview = document.querySelector("#aiReview");
 const aiReviewTitle = document.querySelector("#aiReviewTitle");
 const aiSummaryText = document.querySelector("#aiSummaryText");
 const aiInsightGrid = document.querySelector("#aiInsightGrid");
+const toggleAiDetails = document.querySelector("#toggleAiDetails");
 const detailsPanel = document.querySelector("#detailsPanel");
 const detailsTitle = document.querySelector("#detailsTitle");
 const closeDetails = document.querySelector("#closeDetails");
@@ -118,6 +119,8 @@ analyzeAnother.addEventListener("click", () => {
   aiReview.classList.add("hidden");
   aiSummaryText.textContent = "";
   aiInsightGrid.innerHTML = "";
+  aiInsightGrid.classList.add("hidden");
+  toggleAiDetails.classList.add("hidden");
   detailsPanel.classList.add("hidden");
   detailsTitle.textContent = "Select a category";
   markerGrid.innerHTML = "";
@@ -135,6 +138,11 @@ closeDetails.addEventListener("click", () => {
     button.setAttribute("aria-pressed", "false");
   });
   updateResultNav();
+});
+
+toggleAiDetails.addEventListener("click", () => {
+  const isHidden = aiInsightGrid.classList.toggle("hidden");
+  toggleAiDetails.textContent = isHidden ? "Show full analysis" : "Hide full analysis";
 });
 
 function setLoading(isLoading, label = "Analyzing...") {
@@ -160,6 +168,8 @@ function showStartError(title, message) {
   aiReview.classList.add("hidden");
   aiSummaryText.textContent = "";
   aiInsightGrid.innerHTML = "";
+  aiInsightGrid.classList.add("hidden");
+  toggleAiDetails.classList.add("hidden");
   detailsPanel.classList.add("hidden");
   detailsTitle.textContent = "Select a category";
   markerGrid.innerHTML = "";
@@ -191,12 +201,45 @@ function renderResult(result) {
 
   renderCategoryFilters(result);
   renderAiReview(result);
+  requestAiAnalysis(result);
   detailsPanel.classList.add("hidden");
   detailsTitle.textContent = "Select a category";
   markerGrid.innerHTML = "";
 
   window.scrollTo({ top: 0, behavior: "smooth" });
   updateResultNav();
+}
+
+async function requestAiAnalysis(result) {
+  if (!result.ai_pending || !result.markers.length) return;
+
+  try {
+    const response = await fetch("/api/ai-analysis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: result.id,
+        summary: result.summary,
+        markers: result.markers,
+        categories: result.categories,
+      }),
+    });
+    const aiResult = await response.json();
+    if (!response.ok) throw new Error(aiResult.error || "Gemini analysis failed.");
+    if (!currentResult || currentResult.id !== result.id) return;
+    currentResult = { ...currentResult, ...aiResult };
+    renderAiReview(currentResult);
+  } catch (error) {
+    if (!currentResult || currentResult.id !== result.id) return;
+    currentResult = {
+      ...currentResult,
+      ai_pending: false,
+      ai_error: error.message,
+      ai_analysis: null,
+      ai_summary: null,
+    };
+    renderAiReview(currentResult);
+  }
 }
 
 window.addEventListener("scroll", updateResultNav, { passive: true });
@@ -255,12 +298,21 @@ function formatResultSummary(result) {
 
 function renderAiReview(result) {
   aiInsightGrid.innerHTML = "";
+  aiInsightGrid.classList.add("hidden");
+  toggleAiDetails.classList.add("hidden");
+  toggleAiDetails.textContent = "Show full analysis";
   if (!result.markers.length) {
     aiReview.classList.add("hidden");
     return;
   }
 
   aiReview.classList.remove("hidden");
+  if (result.ai_pending) {
+    aiReviewTitle.textContent = "Gemini Analyzing";
+    aiSummaryText.textContent = "Gemini is reviewing your biomarkers, patterns, and next-step questions. Score and categories are ready now.";
+    return;
+  }
+
   const analysis = normalizeAiAnalysis(result);
   aiReviewTitle.textContent = analysis.isAi ? "Gemini Analysis" : "Gemini Error";
   aiSummaryText.textContent = analysis.summary;
@@ -269,6 +321,10 @@ function renderAiReview(result) {
   addInsightSection("Patterns", analysis.patterns, "hub");
   addInsightSection("Suggested Next Steps", analysis.nextSteps, "checklist");
   addInsightSection("Ask Your Clinician", analysis.questions, "help");
+
+  if (aiInsightGrid.children.length) {
+    toggleAiDetails.classList.remove("hidden");
+  }
 }
 
 function normalizeAiAnalysis(result) {
