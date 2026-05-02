@@ -303,10 +303,12 @@ function renderAiReview(result) {
   toggleAiDetails.textContent = "Show full analysis";
   if (!result.markers.length) {
     aiReview.classList.add("hidden");
+    aiReview.classList.remove("is-loading");
     return;
   }
 
   aiReview.classList.remove("hidden");
+  aiReview.classList.toggle("is-loading", Boolean(result.ai_pending));
   if (result.ai_pending) {
     aiReviewTitle.textContent = "Gemini Analyzing";
     aiSummaryText.textContent = "Gemini is reviewing your biomarkers, patterns, and next-step questions. Score and categories are ready now.";
