@@ -14,7 +14,8 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).parent
 STATIC_DIR = ROOT / "static"
-MAX_UPLOAD_BYTES = 4 * 1024 * 1024
+SAMPLE_DIR = ROOT / "sample_folder"
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_MB", "25")) * 1024 * 1024
 
 
 def load_env(path: Path = ROOT / ".env") -> None:
@@ -437,10 +438,50 @@ BIOMARKER_ABOUT = {
 }
 
 
+SIMPLE_ABOUT = {
+    "vitamin_d": "Helps bones, muscles, mood, and immunity. Low levels are common when sunlight is low.",
+    "vitamin_b12": "Helps nerves and red blood cells. Low B12 can affect energy and tingling/numbness.",
+    "ferritin": "Shows your stored iron. Think of it as the backup iron tank.",
+    "hemoglobin": "The oxygen carrier in red blood cells. Low values can point toward anemia.",
+    "hba1c": "Your average blood sugar picture over the last 2 to 3 months.",
+    "fasting_glucose": "Your blood sugar after fasting. It is a quick snapshot, not the whole movie.",
+    "tsh": "A signal from the brain telling the thyroid how hard to work.",
+    "testosterone": "A hormone tied to libido, energy, muscle, mood, and reproductive health.",
+    "hdl": "The cleanup-style cholesterol marker. Higher is usually better within reason.",
+    "ldl": "The cholesterol marker doctors watch closely for heart risk.",
+    "triglycerides": "Blood fats that often rise with sugar, alcohol, refined carbs, or insulin resistance.",
+    "crp": "A general inflammation marker. It can rise after infection, injury, poor sleep, or chronic inflammation.",
+    "wbc": "Your immune-cell count. It moves with infection, inflammation, stress, and recovery.",
+    "rbc": "Your red blood cell count. These cells carry oxygen around the body.",
+    "hematocrit": "How much of your blood is made of red blood cells. It changes with hydration and anemia.",
+    "platelets": "Small blood cells that help clotting and repair.",
+    "mcv": "Average red blood cell size. It can hint at iron, B12, or folate issues.",
+    "mch": "How much hemoglobin is inside each red blood cell.",
+    "mchc": "How concentrated hemoglobin is inside red blood cells.",
+    "rdw": "How uneven your red blood cell sizes are. More uneven can suggest nutrient issues.",
+    "neutrophils": "Fast-response immune cells, often higher with bacterial infection or stress.",
+    "lymphocytes": "Immune cells used for viruses and immune memory.",
+    "monocytes": "Cleanup immune cells that rise with inflammation and tissue repair.",
+    "eosinophils": "Immune cells linked with allergies, asthma, eczema, and parasites.",
+    "basophils": "Rare immune cells involved in allergy-type reactions.",
+    "alt": "A liver enzyme. Higher values can mean liver cells are irritated.",
+    "ast": "An enzyme from liver and muscle. Hard workouts can also move it.",
+    "creatinine": "A kidney-filtering marker based partly on muscle waste.",
+    "egfr": "An estimate of kidney filtration. Higher is usually better, with context.",
+    "sodium": "A key salt for fluid balance, nerves, and blood pressure.",
+    "potassium": "Important for heart rhythm, nerves, and muscles.",
+    "free_t4": "A thyroid hormone level. It helps show thyroid output.",
+    "free_t3": "An active thyroid hormone tied to energy and metabolism.",
+    "insulin": "Shows how much insulin your body needs while fasting.",
+}
+
+
 def biomarker_about(key: str, name: str, category: str) -> str:
+    if key in SIMPLE_ABOUT:
+        return SIMPLE_ABOUT[key]
     if key in BIOMARKER_ABOUT:
         return BIOMARKER_ABOUT[key]
-    return f"{name} is part of the {category.lower()} section and should be interpreted with nearby markers, symptoms, and lab reference ranges."
+    return f"{name} belongs to the {category.lower()} section. Read it with nearby markers and your lab range."
 
 
 for marker in BIOMARKERS:
@@ -487,6 +528,21 @@ def read_upload(headers: dict[str, str], body: bytes) -> tuple[str, str | None]:
                 file_note = "This app can read PDF, TXT, CSV, and pasted text. Paste the report text if this file is image-based."
 
     return report_text.strip(), file_note
+
+
+def analyze_sample_report() -> tuple[dict, int]:
+    pdfs = sorted(SAMPLE_DIR.glob("*.pdf"))
+    if not pdfs:
+        return {"error": "No sample PDF found in sample_folder/."}, 404
+
+    sample_pdf = pdfs[0]
+    pdf_text, pdf_error = extract_pdf_text(sample_pdf.read_bytes())
+    if not pdf_text.strip():
+        return {"error": pdf_error or f"Could not read text from {sample_pdf.name}."}, 500
+
+    result = analyze_report(pdf_text, f"Loaded sample PDF: {sample_pdf.name}")
+    result["sample_file"] = sample_pdf.name
+    return result, 200
 
 
 def extract_pdf_text(content: bytes) -> tuple[str, str | None]:
@@ -815,13 +871,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
+        if path == "/api/sample":
+            result, status = analyze_sample_report()
+            self.send_json(result, status)
+            return
+
         if path != "/api/analyze":
             self.send_error(404)
             return
 
         length = int(self.headers.get("content-length", "0"))
         if length > MAX_UPLOAD_BYTES:
-            self.send_json({"error": "Upload is too large. Keep it under 4 MB."}, 413)
+            upload_mb = MAX_UPLOAD_BYTES // 1024 // 1024
+            self.send_json({"error": f"Upload is too large. Keep it under {upload_mb} MB."}, 413)
             return
 
         body = self.rfile.read(length)
@@ -850,9 +912,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"BioAI running at http://127.0.0.1:{port}")
+    server = ThreadingHTTPServer((host, port), Handler)
+    print(f"BioAI running at http://{host}:{port}")
     server.serve_forever()
 
 

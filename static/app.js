@@ -1,6 +1,5 @@
 const form = document.querySelector("#reportForm");
 const fileInput = document.querySelector("#reportFile");
-const textInput = document.querySelector("#reportText");
 const loadSample = document.querySelector("#loadSample");
 const markerGrid = document.querySelector("#markerGrid");
 const summaryTitle = document.querySelector("#summaryTitle");
@@ -11,35 +10,21 @@ const focusCount = document.querySelector("#focusCount");
 const disclaimer = document.querySelector("#disclaimer");
 const note = document.querySelector("#note");
 
-const sampleReport = `Vitamin D 28 ng/mL
-Vitamin B12 520 pg/mL
-Ferritin 38 ng/mL
-Hemoglobin 14.2 g/dL
-WBC 6.4 10^3/uL
-RBC 4.9 10^6/uL
-Hematocrit 43 %
-Platelets 240 10^3/uL
-MCV 88 fL
-HbA1c 5.2 %
-Fasting Glucose 93 mg/dL
-Fasting Insulin 7 uIU/mL
-TSH 2.2 mIU/L
-Free T4 1.2 ng/dL
-ALT 24 U/L
-AST 22 U/L
-Creatinine 0.9 mg/dL
-eGFR 101 mL/min
-Sodium 140 mmol/L
-Potassium 4.2 mmol/L
-Total Cholesterol 188 mg/dL
-HDL 54 mg/dL
-LDL 112 mg/dL
-Triglycerides 92 mg/dL
-CRP 0.7 mg/L`;
-
-loadSample.addEventListener("click", () => {
-  textInput.value = sampleReport;
-  form.requestSubmit();
+loadSample.addEventListener("click", async () => {
+  setLoading(true, "Loading sample...");
+  try {
+    const response = await fetch("/api/sample", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not load sample PDF.");
+    renderResult(result);
+    const label = document.querySelector(".dropzone strong");
+    label.textContent = result.sample_file || "Sample PDF";
+  } catch (error) {
+    summaryTitle.textContent = "Sample failed";
+    summaryText.textContent = error.message;
+  } finally {
+    setLoading(false);
+  }
 });
 
 fileInput.addEventListener("change", () => {
@@ -50,6 +35,12 @@ fileInput.addEventListener("change", () => {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!fileInput.files.length) {
+    summaryTitle.textContent = "Choose a report first";
+    summaryText.textContent = "Upload a PDF, TXT, CSV, or TSV file, or use the sample report.";
+    return;
+  }
+
   setLoading(true);
   const data = new FormData(form);
 
@@ -69,10 +60,11 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-function setLoading(isLoading) {
+function setLoading(isLoading, label = "Analyzing...") {
   const button = form.querySelector(".primary");
   button.disabled = isLoading;
-  button.textContent = isLoading ? "Analyzing..." : "Analyze report";
+  loadSample.disabled = isLoading;
+  button.textContent = isLoading ? label : "Analyze report";
 }
 
 function renderResult(result) {
@@ -139,7 +131,7 @@ function createMarkerRow(marker) {
           <h4>${escapeHtml(marker.name)}</h4>
           <span class="status-pill ${marker.status}">${labelForStatus(marker.status)}</span>
         </div>
-        <p class="about">${escapeHtml(marker.about || "This marker should be read with nearby results and your lab reference range.")}</p>
+        <p class="about"><b>What it is:</b> ${escapeHtml(marker.about || "Read this marker with nearby results and your lab range.")}</p>
         <p>${escapeHtml(marker.message)}</p>
         <ul class="tips">${tips}</ul>
       </div>
