@@ -665,10 +665,10 @@ function createEmptyFilterCard(title) {
 
 function titleForScore(score, markerCount) {
   if (!markerCount) return "Report Analysis";
-  if (score >= 85) return "Strong Report";
-  if (score >= 70) return "Good Report";
+  if (score >= 85) return "Mostly Healthy";
+  if (score >= 70) return "Good Overview";
   if (score >= 50) return "Needs Review";
-  return "Review First";
+  return "Needs Attention";
 }
 
 function toneForMarker(marker) {
