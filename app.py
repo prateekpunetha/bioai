@@ -1022,6 +1022,8 @@ class Handler(BaseHTTPRequestHandler):
                 content_type = "text/css; charset=utf-8"
             elif static_path.suffix == ".js":
                 content_type = "application/javascript; charset=utf-8"
+            elif static_path.suffix == ".svg":
+                content_type = "image/svg+xml"
             self.serve_file(static_path, content_type)
             return
         self.send_error(404)
