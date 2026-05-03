@@ -155,9 +155,12 @@ toggleAiDetails.addEventListener("click", () => {
 
 function setLoading(isLoading, label = "Analyzing...") {
   const button = form.querySelector(".primary");
+  const buttonLabel = button.querySelector(".button-label");
   button.disabled = isLoading;
+  button.classList.toggle("is-loading", isLoading);
+  button.setAttribute("aria-busy", isLoading ? "true" : "false");
   loadSample.disabled = isLoading;
-  button.textContent = isLoading ? label : "Analyze Report";
+  buttonLabel.textContent = isLoading ? label : "Analyze Report";
 }
 
 function showUploadError(message) {

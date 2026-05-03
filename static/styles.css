@@ -330,11 +330,33 @@ button:active {
 }
 
 .primary {
+  position: relative;
+  overflow: hidden;
   border: 2px solid var(--primary-bright);
   border-bottom: 6px solid var(--primary-depth);
   background: var(--primary-bright);
   color: #ffffff;
   box-shadow: 0 6px 14px rgba(175, 10, 120, 0.16);
+}
+
+.primary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.2) 45%, transparent 90%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.34));
+  transform: translateX(-105%);
+}
+
+.primary.is-loading::before {
+  animation: analyze-fill 1.25s ease-in-out infinite;
+}
+
+.button-label {
+  position: relative;
+  z-index: 1;
 }
 
 .primary:hover {
@@ -358,6 +380,20 @@ button:active {
 
 .secondary:active {
   border-bottom-width: 3px;
+}
+
+@keyframes analyze-fill {
+  0% {
+    transform: translateX(-105%);
+  }
+
+  55% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(105%);
+  }
 }
 
 .how-it-works {
