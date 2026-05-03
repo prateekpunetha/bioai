@@ -22,6 +22,7 @@ const disclaimer = document.querySelector("#disclaimer");
 const note = document.querySelector("#note");
 const fileLabel = document.querySelector("#fileLabel");
 const uploadError = document.querySelector("#uploadError");
+const siteFooter = document.querySelector(".site-footer");
 const startScreen = document.querySelector("#startScreen");
 const reportScreen = document.querySelector("#reportScreen");
 const resultNav = document.querySelector("#resultNav");
@@ -282,8 +283,8 @@ function updateResultNav() {
     return;
   }
 
-  const footerTop = disclaimer.getBoundingClientRect().top + window.scrollY;
-  const shouldShow = window.scrollY + window.innerHeight >= footerTop - 20;
+  const footerBottom = siteFooter.getBoundingClientRect().bottom + window.scrollY;
+  const shouldShow = window.scrollY + window.innerHeight >= footerBottom - 20;
   resultNav.classList.toggle("hidden", !shouldShow);
 }
 

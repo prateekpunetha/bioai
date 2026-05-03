@@ -1175,11 +1175,12 @@ button:active {
 }
 
 .disclaimer {
-  margin-top: 28px;
+  max-width: 620px;
+  margin: 14px auto 0;
 }
 
 .site-footer {
-  padding: 0 clamp(18px, 4vw, 40px) 42px;
+  padding: 34px clamp(18px, 4vw, 40px) 132px;
   color: var(--text-soft);
   font-size: 0.82rem;
   font-weight: 700;
