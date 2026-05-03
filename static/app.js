@@ -16,6 +16,8 @@ const summaryText = document.querySelector("#summaryText");
 const scoreValue = document.querySelector("#scoreValue");
 const greatCount = document.querySelector("#greatCount");
 const focusCount = document.querySelector("#focusCount");
+const greatStat = document.querySelector("#greatStat");
+const focusStat = document.querySelector("#focusStat");
 const disclaimer = document.querySelector("#disclaimer");
 const note = document.querySelector("#note");
 const fileLabel = document.querySelector("#fileLabel");
@@ -28,7 +30,7 @@ const dropzone = document.querySelector(".dropzone");
 const scoreRing = document.querySelector(".score-ring");
 
 let currentResult = null;
-let activeCategory = "";
+let activeFilter = "";
 
 const markerIcons = {
   Blood: "bloodtype",
@@ -131,14 +133,15 @@ analyzeAnother.addEventListener("click", () => {
 });
 
 closeDetails.addEventListener("click", () => {
-  activeCategory = "";
+  activeFilter = "";
   detailsPanel.classList.add("hidden");
   markerGrid.innerHTML = "";
-  categoryGrid.querySelectorAll(".category-card").forEach((button) => {
-    button.setAttribute("aria-pressed", "false");
-  });
+  updateFilterPressedStates();
   updateResultNav();
 });
+
+greatStat.addEventListener("click", () => renderMarkersForFilter("status:great"));
+focusStat.addEventListener("click", () => renderMarkersForFilter("status:focus"));
 
 toggleAiDetails.addEventListener("click", () => {
   const isHidden = aiInsightGrid.classList.toggle("hidden");
@@ -163,6 +166,10 @@ function showStartError(title, message) {
   scoreRing.style.setProperty("--score", 0);
   greatCount.textContent = "0";
   focusCount.textContent = "0";
+  greatStat.disabled = true;
+  focusStat.disabled = true;
+  activeFilter = "";
+  updateFilterPressedStates();
   categoryGrid.innerHTML = "";
   categoryGrid.classList.add("hidden");
   aiReview.classList.add("hidden");
@@ -179,7 +186,7 @@ function showStartError(title, message) {
 
 function renderResult(result) {
   currentResult = result;
-  activeCategory = "";
+  activeFilter = "";
   startScreen.classList.add("hidden");
   reportScreen.classList.remove("hidden");
   resultNav.classList.add("hidden");
@@ -191,6 +198,9 @@ function renderResult(result) {
   disclaimer.textContent = result.disclaimer;
   greatCount.textContent = result.counts.great || 0;
   focusCount.textContent = (result.counts.low || 0) + (result.counts.high || 0);
+  greatStat.disabled = !(result.counts.great || 0);
+  focusStat.disabled = !((result.counts.low || 0) + (result.counts.high || 0));
+  updateFilterPressedStates();
 
   if (result.note) {
     note.textContent = result.note;
@@ -431,8 +441,8 @@ function createCategoryButton(value, label, count, score, icon) {
   const button = document.createElement("button");
   button.className = "category-card";
   button.type = "button";
-  button.dataset.category = value;
-  button.setAttribute("aria-pressed", value === activeCategory ? "true" : "false");
+  button.dataset.filter = `category:${value}`;
+  button.setAttribute("aria-pressed", button.dataset.filter === activeFilter ? "true" : "false");
   button.innerHTML = `
     <span class="category-icon material-symbols-outlined">${icon}</span>
     <span class="category-copy">
@@ -440,15 +450,13 @@ function createCategoryButton(value, label, count, score, icon) {
       <small>${count} marker${count === 1 ? "" : "s"} &middot; ${score}/100 &middot; tap to view</small>
     </span>
   `;
-  button.addEventListener("click", () => renderMarkersForCategory(value));
+  button.addEventListener("click", () => renderMarkersForFilter(`category:${value}`));
   return button;
 }
 
-function renderMarkersForCategory(categoryName) {
-  activeCategory = categoryName;
-  categoryGrid.querySelectorAll(".category-card").forEach((button) => {
-    button.setAttribute("aria-pressed", button.dataset.category === activeCategory ? "true" : "false");
-  });
+function renderMarkersForFilter(filterValue) {
+  activeFilter = filterValue;
+  updateFilterPressedStates();
 
   markerGrid.innerHTML = "";
   if (!currentResult?.markers?.length) {
@@ -456,14 +464,48 @@ function renderMarkersForCategory(categoryName) {
     return;
   }
 
-  const markers =
-    currentResult.markers.filter((marker) => marker.category === categoryName);
+  const markers = markersForFilter(filterValue);
+  const title = titleForFilter(filterValue);
 
-  detailsTitle.textContent = `${categoryName} Markers`;
+  detailsTitle.textContent = title;
   detailsPanel.classList.remove("hidden");
-  markers.forEach((marker) => markerGrid.appendChild(createMarkerCard(marker)));
+  if (markers.length) {
+    markers.forEach((marker) => markerGrid.appendChild(createMarkerCard(marker)));
+  } else {
+    markerGrid.appendChild(createEmptyFilterCard(title));
+  }
   detailsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   updateResultNav();
+}
+
+function markersForFilter(filterValue) {
+  if (!currentResult?.markers?.length) return [];
+  if (filterValue === "status:great") {
+    return currentResult.markers.filter((marker) => marker.status === "great");
+  }
+  if (filterValue === "status:focus") {
+    return currentResult.markers.filter((marker) => marker.status === "low" || marker.status === "high");
+  }
+  if (filterValue.startsWith("category:")) {
+    const categoryName = filterValue.replace("category:", "");
+    return currentResult.markers.filter((marker) => marker.category === categoryName);
+  }
+  return [];
+}
+
+function titleForFilter(filterValue) {
+  if (filterValue === "status:great") return "Great Markers";
+  if (filterValue === "status:focus") return "Focus Markers";
+  if (filterValue.startsWith("category:")) return `${filterValue.replace("category:", "")} Markers`;
+  return "Detailed Markers";
+}
+
+function updateFilterPressedStates() {
+  categoryGrid.querySelectorAll(".category-card").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.filter === activeFilter ? "true" : "false");
+  });
+  greatStat.setAttribute("aria-pressed", activeFilter === "status:great" ? "true" : "false");
+  focusStat.setAttribute("aria-pressed", activeFilter === "status:focus" ? "true" : "false");
 }
 
 function createMarkerCard(marker) {
@@ -540,6 +582,30 @@ function createEmptyCard() {
     <div class="marker-info">
       <h3><span class="material-symbols-outlined">info</span> What happened?</h3>
       <p>The app needs readable report text. If the PDF is scanned as an image, run OCR first or upload a text/CSV version.</p>
+    </div>
+  `;
+  return card;
+}
+
+function createEmptyFilterCard(title) {
+  const card = document.createElement("article");
+  card.className = "marker-card";
+  card.dataset.tone = "mint";
+  card.innerHTML = `
+    <div class="marker-top">
+      <div class="marker-heading">
+        <span class="marker-icon">
+          <span class="material-symbols-outlined">filter_alt_off</span>
+        </span>
+        <div class="marker-title">
+          <div class="marker-category">No matches</div>
+          <h2>${escapeHtml(title)}</h2>
+        </div>
+      </div>
+    </div>
+    <div class="marker-info">
+      <h3><span class="material-symbols-outlined">info</span> What happened?</h3>
+      <p>No biomarkers matched this filter in the current report.</p>
     </div>
   `;
   return card;

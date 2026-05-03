@@ -92,9 +92,13 @@
             </div>
           </div>
           <p id="summaryText" class="score-summary">Upload a report or try the sample PDF to begin.</p>
-          <div class="mini-stats">
-            <span><b id="greatCount">0</b> great</span>
-            <span><b id="focusCount">0</b> focus</span>
+          <div class="mini-stats" aria-label="Quick marker filters">
+            <button id="greatStat" type="button" data-filter="status:great">
+              <b id="greatCount">0</b> great
+            </button>
+            <button id="focusStat" type="button" data-filter="status:focus">
+              <b id="focusCount">0</b> focus
+            </button>
           </div>
         </section>
 
