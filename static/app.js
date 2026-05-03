@@ -215,7 +215,10 @@ function renderResult(result) {
   const score = result.score || 0;
   animateScore(score);
   summaryTitle.textContent = titleForScore(score, result.markers.length);
-  summaryText.textContent = formatResultSummary(result);
+  summaryText.textContent = result.markers.length
+    ? ""
+    : "No recognizable biomarkers were found. Try a text-based PDF, TXT, CSV, or TSV report.";
+  summaryText.classList.toggle("hidden", Boolean(result.markers.length));
   disclaimer.textContent = result.disclaimer;
   greatCount.textContent = result.counts.great || 0;
   focusCount.textContent = (result.counts.low || 0) + (result.counts.high || 0);
@@ -223,12 +226,7 @@ function renderResult(result) {
   focusStat.disabled = !((result.counts.low || 0) + (result.counts.high || 0));
   updateFilterPressedStates();
 
-  if (result.note) {
-    note.textContent = result.note;
-    note.classList.remove("hidden");
-  } else {
-    note.classList.add("hidden");
-  }
+  note.classList.add("hidden");
 
   renderCategoryFilters(result);
   renderAiReview(result);
@@ -312,20 +310,6 @@ function animateScore(targetScore) {
   }
 
   requestAnimationFrame(tick);
-}
-
-function formatResultSummary(result) {
-  if (!result.markers.length) {
-    return "No recognizable biomarkers were found. Try a text-based PDF, TXT, CSV, or TSV report.";
-  }
-
-  const total = result.markers.length;
-  const sections = result.categories.length;
-  const review = (result.counts.low || 0) + (result.counts.high || 0);
-  const strong = result.counts.great || 0;
-  const inRange = result.counts.ok || 0;
-  const reviewText = review ? `${review} need review` : "no urgent flags";
-  return `Analyzed ${total} biomarkers in ${sections} sections. ${reviewText}; ${strong} look strong; ${inRange} are in range.`;
 }
 
 function renderAiReview(result) {
