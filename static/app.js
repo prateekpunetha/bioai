@@ -22,7 +22,6 @@ const disclaimer = document.querySelector("#disclaimer");
 const note = document.querySelector("#note");
 const fileLabel = document.querySelector("#fileLabel");
 const uploadError = document.querySelector("#uploadError");
-const siteFooter = document.querySelector(".site-footer");
 const startScreen = document.querySelector("#startScreen");
 const reportScreen = document.querySelector("#reportScreen");
 const resultNav = document.querySelector("#resultNav");
@@ -272,18 +271,13 @@ async function requestAiAnalysis(result) {
   }
 }
 
-window.addEventListener("scroll", updateResultNav, { passive: true });
-window.addEventListener("resize", updateResultNav);
-
 function updateResultNav() {
   if (reportScreen.classList.contains("hidden") || !currentResult?.markers?.length) {
     resultNav.classList.add("hidden");
     return;
   }
 
-  const footerBottom = siteFooter.getBoundingClientRect().bottom + window.scrollY;
-  const shouldShow = window.scrollY + window.innerHeight >= footerBottom - 20;
-  resultNav.classList.toggle("hidden", !shouldShow);
+  resultNav.classList.remove("hidden");
 }
 
 function animateScore(targetScore) {

@@ -1180,7 +1180,7 @@ button:active {
 }
 
 .site-footer {
-  padding: 34px clamp(18px, 4vw, 40px) 132px;
+  padding: 28px clamp(18px, 4vw, 40px) 0;
   color: var(--text-soft);
   font-size: 0.82rem;
   font-weight: 700;
@@ -1198,40 +1198,23 @@ button:active {
 }
 
 .result-nav {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 30;
   display: grid;
+  width: min(100% - 36px, 760px);
   grid-template-columns: 1fr 2fr;
   gap: 16px;
-  padding: 20px clamp(18px, 4vw, 40px) 28px;
+  margin: 18px auto 28px;
+  padding: 18px;
   border: 2px solid var(--outline-variant);
-  border-bottom: 0;
-  border-radius: 32px 32px 0 0;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(12px);
-  animation: navPop 0.22s ease both;
+  border-bottom: 7px solid var(--outline-variant);
+  border-radius: 24px;
+  background: var(--surface-lowest);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
 }
 
 @keyframes riseIn {
   from {
     opacity: 0;
     transform: translateY(10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes navPop {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
   }
 
   to {
