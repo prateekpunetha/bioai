@@ -822,6 +822,9 @@ def generate_ai_analysis(markers: list[dict], categories: list[dict], fallback: 
         return None, "GEMINI_API_KEY or GOOGLE_API_KEY is not configured." if markers else None
 
     model = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
+    focus_markers = [item for item in markers if item.get("status") in ("low", "high")]
+    near_boundary = [item for item in markers if item.get("status") == "ok"][:6]
+    strong_markers = [item for item in markers if item.get("status") == "great"][:8]
     compact_markers = [
         {
             "name": item["name"],
@@ -830,9 +833,9 @@ def generate_ai_analysis(markers: list[dict], categories: list[dict], fallback: 
             "category": item["category"],
             "status": item["status"],
             "message": item["message"],
-            "tips": item["tips"][:2],
+            "tip": item["tips"][0] if item.get("tips") else "",
         }
-        for item in markers
+        for item in [*focus_markers, *near_boundary, *strong_markers]
     ]
     compact_categories = [
         {
@@ -846,13 +849,26 @@ def generate_ai_analysis(markers: list[dict], categories: list[dict], fallback: 
         "You are BioAI, a blood report explainer. Analyze the parsed report for a consumer. "
         "Do not diagnose, do not claim certainty, and do not prescribe treatment. "
         "Return ONLY valid JSON, with no markdown. Use this exact shape: "
-        '{"summary":"2-3 sentence overall interpretation","patterns":["pattern insight"],'
-        '"review_first":[{"marker":"name","reason":"why it matters","suggestion":"safe next step"}],'
-        '"next_steps":["safe step"],"clinician_questions":["question"]}. '
-        "Name the main low/high markers. Explain relationships or patterns across categories when possible. "
-        "Keep summary under 70 words. Keep each array to 2-3 items. Keep each string under 120 characters. Use plain English. "
+        '{"summary":"short overall interpretation","patterns":["short cross-marker pattern"],'
+        '"review_first":[{"marker":"name","reason":"short reason","suggestion":"safe next step"}],'
+        '"next_steps":["safe step"]}. '
+        "Keep patterns, but return max 2 patterns. Name main low/high markers. "
+        "Keep summary under 55 words. Keep review_first max 3 items. Keep next_steps max 2 items. "
+        "Keep every string under 100 characters. Use plain English. "
         "Every suggestion must be educational and safe, not a diagnosis or prescription.\n\n"
-        + json.dumps({"fallback_summary": fallback, "categories": compact_categories, "markers": compact_markers})
+        + json.dumps(
+            {
+                "fallback_summary": fallback,
+                "counts": {
+                    "total": len(markers),
+                    "focus": len(focus_markers),
+                    "near_boundary": len(near_boundary),
+                    "strong_sample": len(strong_markers),
+                },
+                "categories": compact_categories,
+                "markers": compact_markers,
+            }
+        )
     )
 
     sdk_analysis, sdk_error = generate_ai_analysis_with_sdk(api_key, model, prompt)
@@ -878,7 +894,7 @@ def generate_ai_analysis_with_sdk(api_key: str, model: str, prompt: str) -> tupl
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.35,
-                max_output_tokens=1600,
+                max_output_tokens=2500,
                 response_mime_type="application/json",
             ),
         )
@@ -905,7 +921,7 @@ def generate_ai_analysis_with_rest(api_key: str, model: str, prompt: str) -> tup
             ],
             "generationConfig": {
                 "temperature": 0.35,
-                "maxOutputTokens": 1600,
+                "maxOutputTokens": 2500,
                 "responseMimeType": "application/json",
             },
         }

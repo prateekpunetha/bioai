@@ -331,7 +331,7 @@ function renderAiReview(result) {
 
 function normalizeAiAnalysis(result) {
   const ai = result.ai_analysis || {};
-  const hasUsefulAi = result.ai_enabled && typeof ai.summary === "string" && ai.summary.trim().length >= 80;
+  const hasUsefulAi = result.ai_enabled && typeof ai.summary === "string" && ai.summary.trim().length >= 20;
   if (hasUsefulAi) {
     return {
       isAi: true,
