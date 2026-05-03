@@ -1200,7 +1200,7 @@ button:active {
 .result-nav {
   display: grid;
   width: min(100% - 36px, 760px);
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: 1fr 1.2fr 1.6fr;
   gap: 16px;
   margin: 18px auto 28px;
   padding: 18px;
@@ -1234,6 +1234,86 @@ button:active {
 
   100% {
     transform: translateX(270%);
+  }
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #ffffff;
+  }
+
+  body {
+    color: #241821;
+    font-size: 12px;
+  }
+
+  .topbar,
+  .start-screen,
+  .section-label,
+  .category-grid,
+  .result-nav,
+  .details-head .icon-button,
+  .ai-toggle {
+    display: none !important;
+  }
+
+  .app-shell {
+    width: 100%;
+    padding: 0;
+  }
+
+  .report-screen {
+    display: block !important;
+  }
+
+  .score-hero,
+  .ai-review,
+  .details-panel,
+  .marker-card {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+
+  .score-hero {
+    min-height: 0;
+    padding: 0 0 12px;
+    border: 0;
+    background: #ffffff;
+  }
+
+  .score-ring {
+    width: 118px;
+    height: 118px;
+  }
+
+  .ai-review,
+  .details-panel {
+    margin-top: 14px;
+    border-bottom-width: 2px;
+  }
+
+  .ai-insight-grid,
+  .marker-grid {
+    display: block !important;
+  }
+
+  .ai-insight-section,
+  .marker-card {
+    margin-bottom: 10px;
+  }
+
+  .marker-card {
+    padding: 14px;
+    border-bottom-width: 2px;
+  }
+
+  .site-footer {
+    padding: 12px 0 0;
   }
 }
 

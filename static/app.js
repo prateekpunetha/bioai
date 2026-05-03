@@ -26,6 +26,7 @@ const startScreen = document.querySelector("#startScreen");
 const reportScreen = document.querySelector("#reportScreen");
 const resultNav = document.querySelector("#resultNav");
 const backToStart = document.querySelector("#backToStart");
+const exportReport = document.querySelector("#exportReport");
 const analyzeAnother = document.querySelector("#analyzeAnother");
 const dropzone = document.querySelector(".dropzone");
 const scoreRing = document.querySelector(".score-ring");
@@ -113,6 +114,21 @@ backToStart.addEventListener("click", () => {
   reportScreen.classList.add("hidden");
   resultNav.classList.add("hidden");
   window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+exportReport.addEventListener("click", () => {
+  if (!currentResult?.markers?.length) return;
+  const restore = prepareReportExport();
+  let restored = false;
+  const restoreOnce = () => {
+    if (restored) return;
+    restored = true;
+    window.removeEventListener("afterprint", restoreOnce);
+    restore();
+  };
+  window.addEventListener("afterprint", restoreOnce);
+  window.print();
+  window.setTimeout(restoreOnce, 1200);
 });
 
 analyzeAnother.addEventListener("click", () => {
@@ -278,6 +294,42 @@ function updateResultNav() {
   }
 
   resultNav.classList.remove("hidden");
+}
+
+function prepareReportExport() {
+  const previous = {
+    markerGridHtml: markerGrid.innerHTML,
+    detailsHidden: detailsPanel.classList.contains("hidden"),
+    detailsTitle: detailsTitle.textContent,
+    aiGridHidden: aiInsightGrid.classList.contains("hidden"),
+    toggleHidden: toggleAiDetails.classList.contains("hidden"),
+    toggleText: toggleAiDetails.textContent,
+    activeFilter,
+  };
+
+  document.body.classList.add("is-exporting");
+  activeFilter = "";
+  updateFilterPressedStates();
+  detailsTitle.textContent = "All Markers";
+  detailsPanel.classList.remove("hidden");
+  markerGrid.innerHTML = "";
+  currentResult.markers.forEach((marker) => markerGrid.appendChild(createMarkerCard(marker)));
+  if (aiInsightGrid.children.length) {
+    aiInsightGrid.classList.remove("hidden");
+    toggleAiDetails.classList.add("hidden");
+  }
+
+  return () => {
+    document.body.classList.remove("is-exporting");
+    activeFilter = previous.activeFilter;
+    updateFilterPressedStates();
+    markerGrid.innerHTML = previous.markerGridHtml;
+    detailsTitle.textContent = previous.detailsTitle;
+    detailsPanel.classList.toggle("hidden", previous.detailsHidden);
+    aiInsightGrid.classList.toggle("hidden", previous.aiGridHidden);
+    toggleAiDetails.classList.toggle("hidden", previous.toggleHidden);
+    toggleAiDetails.textContent = previous.toggleText;
+  };
 }
 
 function animateScore(targetScore) {
