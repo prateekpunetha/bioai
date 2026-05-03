@@ -1178,6 +1178,24 @@ button:active {
   margin-top: 28px;
 }
 
+.site-footer {
+  padding: 0 clamp(18px, 4vw, 40px) 42px;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.site-footer a {
+  color: var(--primary);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
+}
+
 .result-nav {
   position: fixed;
   right: 0;
