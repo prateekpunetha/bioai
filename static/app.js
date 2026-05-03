@@ -21,6 +21,7 @@ const focusStat = document.querySelector("#focusStat");
 const disclaimer = document.querySelector("#disclaimer");
 const note = document.querySelector("#note");
 const fileLabel = document.querySelector("#fileLabel");
+const uploadError = document.querySelector("#uploadError");
 const startScreen = document.querySelector("#startScreen");
 const reportScreen = document.querySelector("#reportScreen");
 const resultNav = document.querySelector("#resultNav");
@@ -46,6 +47,7 @@ const markerIcons = {
 };
 
 loadSample.addEventListener("click", async () => {
+  clearUploadError();
   setLoading(true, "Loading Sample...");
   try {
     const response = await fetch("/api/sample", { method: "POST" });
@@ -63,6 +65,7 @@ loadSample.addEventListener("click", async () => {
 fileInput.addEventListener("change", () => {
   const file = fileInput.files[0];
   fileLabel.textContent = file ? file.name : "Choose File";
+  clearUploadError();
 });
 
 dropzone.addEventListener("dragover", (event) => {
@@ -75,15 +78,17 @@ dropzone.addEventListener("drop", (event) => {
   if (!file) return;
   fileInput.files = event.dataTransfer.files;
   fileLabel.textContent = file.name;
+  clearUploadError();
 });
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!fileInput.files.length) {
-    showStartError("Choose a report first", "Upload a PDF, TXT, CSV, or TSV file, or use the sample report.");
+    showUploadError("Choose a report first. Upload a PDF, TXT, CSV, or TSV file, or use the sample report.");
     return;
   }
 
+  clearUploadError();
   setLoading(true);
   const data = new FormData(form);
 
@@ -153,6 +158,18 @@ function setLoading(isLoading, label = "Analyzing...") {
   button.disabled = isLoading;
   loadSample.disabled = isLoading;
   button.textContent = isLoading ? label : "Analyze Report";
+}
+
+function showUploadError(message) {
+  uploadError.textContent = message;
+  uploadError.classList.remove("hidden");
+  dropzone.classList.add("has-error");
+}
+
+function clearUploadError() {
+  uploadError.textContent = "";
+  uploadError.classList.add("hidden");
+  dropzone.classList.remove("has-error");
 }
 
 function showStartError(title, message) {

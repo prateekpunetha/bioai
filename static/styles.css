@@ -224,6 +224,11 @@ button {
   transform: translateY(-2px);
 }
 
+.dropzone.has-error {
+  border-color: var(--error);
+  background: var(--error-soft);
+}
+
 .dropzone:active {
   box-shadow: 0 8px 0 #8d727d;
   transform: translateY(4px);
@@ -302,6 +307,17 @@ button {
   grid-template-columns: 2fr 1fr;
   gap: 16px;
   margin-top: 24px;
+}
+
+.upload-error {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 2px solid var(--error);
+  border-radius: 8px;
+  background: var(--error-soft);
+  color: var(--error);
+  font-size: 0.88rem;
+  font-weight: 800;
 }
 
 button {
