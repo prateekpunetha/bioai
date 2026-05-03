@@ -1175,8 +1175,8 @@ button:active {
 }
 
 .disclaimer {
-  max-width: 620px;
-  margin: 14px auto 0;
+  margin: -2px 0 0;
+  text-align: left;
 }
 
 .site-footer {
