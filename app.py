@@ -721,6 +721,7 @@ def message(value: float, marker: dict) -> str:
 def analyze_report(text: str, note: str | None = None) -> dict:
     # Main analyzer. No black box here: parse values, compare to our ranges,
     # and group the results. Gemini runs separately so first render is fast.
+    demographics = extract_demographics(text)
     markers = [found for marker in BIOMARKERS if (found := find_marker(text, marker))]
     markers = sorted(markers, key=lambda item: (item["category"], status_rank(item["status"]), item["name"]))
     status_counts = {name: sum(1 for item in markers if item["status"] == name) for name in ["great", "ok", "low", "high"]}
@@ -752,12 +753,102 @@ def analyze_report(text: str, note: str | None = None) -> dict:
         "ai_pending": bool(ai_enabled and markers),
         "markers": markers,
         "categories": categories,
+        "demographics": demographics,
         "focus": focus[:6],
         "wins": wins[:6],
         "counts": status_counts,
         "note": note,
         "disclaimer": "Educational only. Reference ranges vary by lab, sex, age, pregnancy status, medications, and medical history. Do not use this as a diagnosis.",
     }
+
+
+def extract_demographics(text: str) -> dict:
+    header = "\n".join(text.splitlines()[:80])
+    compact_header = re.sub(r"[ \t]+", " ", header)
+    return {
+        "name": extract_patient_name(header),
+        "age": extract_patient_age(compact_header),
+        "sex": extract_patient_sex(compact_header),
+    }
+
+
+def extract_patient_name(header: str) -> str:
+    patterns = [
+        r"\b(?:patient\s+name|name\s+of\s+patient|client\s+name)\s*[:\-]\s*([A-Za-z][A-Za-z .'-]{1,60})",
+        r"\b(?:patient|name)\s*[:\-]\s*([A-Za-z][A-Za-z .'-]{1,60})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, header, re.IGNORECASE)
+        if not match:
+            continue
+        name = clean_patient_name(match.group(1))
+        if name:
+            return name
+    return ""
+
+
+def clean_patient_name(value: str) -> str:
+    value = re.split(r"\s{2,}|\t|\||,|\b(?:age|sex|gender|mobile|phone|uhid|id|date|dob)\b", value, maxsplit=1, flags=re.IGNORECASE)[0]
+    value = re.sub(r"[^A-Za-z .'-]", "", value)
+    value = re.sub(r"\s+", " ", value).strip(" .'-")
+    if not value or len(value) > 45:
+        return ""
+    lowered = value.lower()
+    blocked = ("report", "sample", "laboratory", "diagnostic", "blood", "test", "department")
+    if any(word in lowered for word in blocked):
+        return ""
+    if len(value.replace(" ", "")) < 2:
+        return ""
+    return value.title()
+
+
+def extract_patient_age(header: str) -> int | None:
+    patterns = [
+        r"\bage\s*(?:/|and)?\s*(?:sex|gender)?\s*[:\-]?\s*(\d{1,3})\s*(?:years?|yrs?|y)?",
+        r"\b(\d{1,3})\s*(?:years?|yrs?)\s*(?:old)?\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, header, re.IGNORECASE)
+        if not match:
+            continue
+        age = int(match.group(1))
+        if 0 < age < 120:
+            return age
+    return None
+
+
+def extract_patient_sex(header: str) -> str:
+    patterns = [
+        r"\b(?:sex|gender)\s*[:\-]?\s*(male|female|m|f|other)\b",
+        r"\bage\s*/\s*(?:sex|gender)\s*[:\-]?\s*\d{1,3}\s*/\s*(male|female|m|f|other)\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, header, re.IGNORECASE)
+        if not match:
+            continue
+        value = match.group(1).lower()
+        if value == "m":
+            return "male"
+        if value == "f":
+            return "female"
+        return value
+    return ""
+
+
+def compact_demographics(demographics: dict) -> dict:
+    name = clean_patient_name(str(demographics.get("name") or ""))
+    age = demographics.get("age")
+    sex = str(demographics.get("sex") or "").strip().lower()
+    compact = {}
+    if name:
+        compact["first_name"] = name.split()[0]
+    if isinstance(age, int) and 0 < age < 120:
+        compact["age"] = age
+    elif isinstance(age, str) and age.isdigit() and 0 < int(age) < 120:
+        compact["age"] = int(age)
+    if sex in ("male", "female", "other"):
+        compact["sex"] = sex
+    return compact
 
 
 def status_rank(status: str) -> int:
@@ -800,9 +891,10 @@ def build_categories(markers: list[dict]) -> list[dict]:
 def analyze_with_gemini_payload(payload: dict) -> dict:
     markers = payload.get("markers") if isinstance(payload.get("markers"), list) else []
     categories = payload.get("categories") if isinstance(payload.get("categories"), list) else []
+    demographics = payload.get("demographics") if isinstance(payload.get("demographics"), dict) else {}
     summary = str(payload.get("summary") or "")
     ai_enabled = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
-    ai_analysis, ai_error = generate_ai_analysis(markers, categories, summary)
+    ai_analysis, ai_error = generate_ai_analysis(markers, categories, summary, demographics)
     return {
         "id": payload.get("id"),
         "ai_enabled": ai_enabled,
@@ -814,7 +906,12 @@ def analyze_with_gemini_payload(payload: dict) -> dict:
     }
 
 
-def generate_ai_analysis(markers: list[dict], categories: list[dict], fallback: str) -> tuple[dict | None, str | None]:
+def generate_ai_analysis(
+    markers: list[dict],
+    categories: list[dict],
+    fallback: str,
+    demographics: dict | None = None,
+) -> tuple[dict | None, str | None]:
     # Gemini polish layer. If GEMINI_API_KEY is missing or the API fails, the
     # UI reports that Gemini is not configured instead of pretending AI ran.
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -822,6 +919,7 @@ def generate_ai_analysis(markers: list[dict], categories: list[dict], fallback: 
         return None, "GEMINI_API_KEY or GOOGLE_API_KEY is not configured." if markers else None
 
     model = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
+    demographics = compact_demographics(demographics or {})
     focus_markers = [item for item in markers if item.get("status") in ("low", "high")]
     near_boundary = [item for item in markers if item.get("status") == "ok"][:6]
     strong_markers = [item for item in markers if item.get("status") == "great"][:8]
@@ -854,11 +952,14 @@ def generate_ai_analysis(markers: list[dict], categories: list[dict], fallback: 
         '"next_steps":["safe step"]}. '
         "Keep patterns, but return max 2 patterns. Name main low/high markers. "
         "Keep summary under 55 words. Keep review_first max 3 items. Keep next_steps max 2 items. "
+        "If a patient name is provided, the summary may start with a natural greeting using first name only. "
+        "Use age and sex only as context; do not mention them unless they help explain reference-range context. "
         "Keep every string under 100 characters. Use plain English. "
         "Every suggestion must be educational and safe, not a diagnosis or prescription.\n\n"
         + json.dumps(
             {
                 "fallback_summary": fallback,
+                "patient_context": demographics,
                 "counts": {
                     "total": len(markers),
                     "focus": len(focus_markers),

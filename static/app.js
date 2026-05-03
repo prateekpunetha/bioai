@@ -230,6 +230,7 @@ async function requestAiAnalysis(result) {
       body: JSON.stringify({
         id: result.id,
         summary: result.summary,
+        demographics: result.demographics,
         markers: result.markers,
         categories: result.categories,
       }),
