@@ -270,7 +270,7 @@ async function requestAiAnalysis(result) {
       }),
     });
     const aiResult = await response.json();
-    if (!response.ok) throw new Error(aiResult.error || "Gemini analysis failed.");
+    if (!response.ok) throw new Error(aiResult.error || "AI analysis failed.");
     if (!currentResult || currentResult.id !== result.id) return;
     currentResult = { ...currentResult, ...aiResult };
     renderAiReview(currentResult);
@@ -372,13 +372,13 @@ function renderAiReview(result) {
   aiReview.classList.remove("hidden");
   aiReview.classList.toggle("is-loading", Boolean(result.ai_pending));
   if (result.ai_pending) {
-    aiReviewTitle.textContent = "Gemini Analyzing";
-    aiSummaryText.textContent = "Gemini is reviewing your biomarkers, possible patterns, and next steps. Score and categories are ready now.";
+    aiReviewTitle.textContent = "AI Analysis";
+    aiSummaryText.textContent = "AI is reviewing your biomarkers, possible patterns, and clinician questions. Score and categories are ready now.";
     return;
   }
 
   const analysis = normalizeAiAnalysis(result);
-  aiReviewTitle.textContent = analysis.isAi ? "Gemini Analysis" : "Gemini Error";
+  aiReviewTitle.textContent = analysis.isAi ? "AI Analysis" : "AI Error";
   aiSummaryText.textContent = analysis.summary;
 
   addInsightSection("Review First", analysis.reviewFirst, "priority_high");
@@ -407,7 +407,7 @@ function normalizeAiAnalysis(result) {
 
   return {
     isAi: false,
-    summary: result.ai_error || "Gemini did not return an analysis. Check GEMINI_API_KEY / GOOGLE_API_KEY, model name, network access, and API key restrictions.",
+    summary: result.ai_error || "AI did not return an analysis. Check GEMINI_API_KEY / GOOGLE_API_KEY, model name, network access, and API key restrictions.",
     reviewFirst: [],
     patterns: [],
     goodSigns: [],
