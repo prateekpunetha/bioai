@@ -373,7 +373,7 @@ function renderAiReview(result) {
   aiReview.classList.toggle("is-loading", Boolean(result.ai_pending));
   if (result.ai_pending) {
     aiReviewTitle.textContent = "Gemini Analyzing";
-    aiSummaryText.textContent = "Gemini is reviewing your biomarkers, patterns, and next-step questions. Score and categories are ready now.";
+    aiSummaryText.textContent = "Gemini is reviewing your biomarkers, possible patterns, and next steps. Score and categories are ready now.";
     return;
   }
 
@@ -382,9 +382,9 @@ function renderAiReview(result) {
   aiSummaryText.textContent = analysis.summary;
 
   addInsightSection("Review First", analysis.reviewFirst, "priority_high");
-  addInsightSection("Patterns", analysis.patterns, "hub");
-  addInsightSection("Suggested Next Steps", analysis.nextSteps, "checklist");
-  addInsightSection("Ask Your Clinician", analysis.questions, "help");
+  addInsightSection("Possible Patterns", analysis.patterns, "hub");
+  addInsightSection("Good Signs", analysis.goodSigns, "verified");
+  addInsightSection("Questions to Ask Your Clinician", analysis.questionsToAsk, "help");
 
   if (aiInsightGrid.children.length) {
     toggleAiDetails.classList.remove("hidden");
@@ -400,8 +400,8 @@ function normalizeAiAnalysis(result) {
       summary: ai.summary.trim(),
       reviewFirst: normalizeAiReviewItems(ai.review_first),
       patterns: normalizeTextItems(ai.patterns),
-      nextSteps: normalizeTextItems(ai.next_steps),
-      questions: normalizeTextItems(ai.clinician_questions),
+      goodSigns: normalizeTextItems(ai.good_signs),
+      questionsToAsk: normalizeTextItems(ai.questions_to_ask),
     };
   }
 
@@ -410,8 +410,8 @@ function normalizeAiAnalysis(result) {
     summary: result.ai_error || "Gemini did not return an analysis. Check GEMINI_API_KEY / GOOGLE_API_KEY, model name, network access, and API key restrictions.",
     reviewFirst: [],
     patterns: [],
-    nextSteps: [],
-    questions: [],
+    goodSigns: [],
+    questionsToAsk: [],
   };
 }
 

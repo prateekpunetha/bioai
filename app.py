@@ -949,9 +949,13 @@ def generate_ai_analysis(
         "Return ONLY valid JSON, with no markdown. Use this exact shape: "
         '{"summary":"short overall interpretation","patterns":["short cross-marker pattern"],'
         '"review_first":[{"marker":"name","reason":"short reason","suggestion":"safe next step"}],'
-        '"next_steps":["safe step"]}. '
+        '"good_signs":["positive marker insight"],"questions_to_ask":["question to ask"]}. '
         "Keep patterns, but return max 2 patterns. Name main low/high markers. "
-        "Keep summary under 55 words. Keep review_first max 3 items. Keep next_steps max 2 items. "
+        "Keep summary under 55 words. Keep review_first max 3 items. "
+        "Keep good_signs max 2 items and questions_to_ask max 2 items. "
+        "Questions should help the user discuss the report with a clinician, not self-treat. "
+        "Every pattern must name actual markers and explain a concrete relationship. "
+        "Avoid vague phrases like blood indices, related markers, specific markers, or overall pattern. "
         "If a patient name is provided, the summary may start with a natural greeting using first name only. "
         "Use age and sex only as context; do not mention them unless they help explain reference-range context. "
         "Keep every string under 100 characters. Use plain English. "
@@ -1072,8 +1076,8 @@ def parse_ai_analysis(text: str) -> dict | None:
         "summary": str(data.get("summary", "")).strip(),
         "patterns": normalize_string_list(data.get("patterns")),
         "review_first": normalize_review_items(data.get("review_first")),
-        "next_steps": normalize_string_list(data.get("next_steps")),
-        "clinician_questions": normalize_string_list(data.get("clinician_questions")),
+        "good_signs": normalize_string_list(data.get("good_signs")),
+        "questions_to_ask": normalize_string_list(data.get("questions_to_ask")),
     }
 
 
