@@ -998,11 +998,105 @@ button:active {
 }
 
 .marker-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   overflow-wrap: anywhere;
   color: var(--text);
   font-size: clamp(1.12rem, 4vw, 1.5rem);
   font-weight: 900;
   line-height: 1.15;
+}
+
+.term-help {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.term-help-button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  place-items: center;
+  border: 2px solid var(--outline-variant);
+  border-radius: 999px;
+  background: var(--surface-low);
+  color: var(--primary);
+  padding: 0;
+  box-shadow: none;
+}
+
+.term-help-button .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.term-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  z-index: 8;
+  display: grid;
+  width: min(300px, calc(100vw - 48px));
+  gap: 7px;
+  padding: 13px 14px;
+  border: 2px solid var(--outline-variant);
+  border-radius: 14px;
+  background: var(--surface-lowest);
+  box-shadow: 0 14px 32px rgba(36, 24, 33, 0.16);
+  color: var(--text-soft);
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  text-transform: none;
+  transform: translate(-50%, 6px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.term-popover::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid var(--outline-variant);
+  border-bottom: 2px solid var(--outline-variant);
+  background: var(--surface-lowest);
+  transform: translate(-50%, -6px) rotate(45deg);
+}
+
+.term-popover strong {
+  color: var(--text);
+  font-family: Lexend, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.term-popover a {
+  position: relative;
+  z-index: 1;
+  width: max-content;
+  max-width: 100%;
+  color: var(--primary);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.term-popover a:hover {
+  text-decoration: underline;
+}
+
+.term-help:hover .term-popover,
+.term-help:focus-within .term-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
 }
 
 .marker-category {
@@ -1258,6 +1352,7 @@ button:active {
   .category-grid,
   .result-nav,
   .details-head .icon-button,
+  .term-help,
   .ai-toggle {
     display: none !important;
   }
@@ -1351,6 +1446,24 @@ button:active {
   .steps-grid,
   .result-nav {
     grid-template-columns: 1fr;
+  }
+
+  .term-popover {
+    right: -8px;
+    left: auto;
+    width: min(280px, calc(100vw - 42px));
+    transform: translateY(6px);
+  }
+
+  .term-popover::after {
+    right: 14px;
+    left: auto;
+    transform: translateY(-6px) rotate(45deg);
+  }
+
+  .term-help:hover .term-popover,
+  .term-help:focus-within .term-popover {
+    transform: translateY(0);
   }
 
   .steps-grid {

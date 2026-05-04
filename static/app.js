@@ -47,6 +47,54 @@ const markerIcons = {
   Vitamins: "wb_sunny",
 };
 
+const markerLearnMore = {
+  vitamin_d: ["MedlinePlus", "https://medlineplus.gov/vitamind.html"],
+  vitamin_b12: ["MedlinePlus", "https://medlineplus.gov/ency/article/002403.htm"],
+  ferritin: ["MedlinePlus", "https://medlineplus.gov/lab-tests/ferritin-blood-test/"],
+  hemoglobin: ["MedlinePlus", "https://medlineplus.gov/lab-tests/hemoglobin-test/"],
+  hba1c: ["MedlinePlus", "https://medlineplus.gov/a1c.html"],
+  fasting_glucose: ["MedlinePlus", "https://medlineplus.gov/bloodglucose.html"],
+  tsh: ["MedlinePlus", "https://medlineplus.gov/lab-tests/tsh-thyroid-stimulating-hormone-test/"],
+  testosterone: ["MedlinePlus", "https://medlineplus.gov/lab-tests/testosterone-levels-test/"],
+  total_cholesterol: ["MedlinePlus", "https://medlineplus.gov/cholesterollevelswhatyouneedtoknow.html"],
+  hdl: ["MedlinePlus", "https://medlineplus.gov/hdlthegoodcholesterol.html"],
+  ldl: ["MedlinePlus", "https://medlineplus.gov/ldlthebadcholesterol.html"],
+  triglycerides: ["MedlinePlus", "https://medlineplus.gov/triglycerides.html"],
+  crp: ["MedlinePlus", "https://medlineplus.gov/lab-tests/c-reactive-protein-crp-test/"],
+  creatinine: ["MedlinePlus", "https://medlineplus.gov/lab-tests/creatinine-test/"],
+  urea: ["MedlinePlus", "https://medlineplus.gov/lab-tests/bun-blood-urea-nitrogen/"],
+  rdw: ["Cleveland Clinic", "https://my.clevelandclinic.org/health/diagnostics/22980-rdw-blood-test"],
+};
+
+const markerGlossary = {
+  vitamin_d: "Vitamin D helps with bones, muscles, and immune function.",
+  vitamin_b12: "Vitamin B12 supports nerves and healthy red blood cells.",
+  ferritin: "Ferritin reflects stored iron in the body.",
+  hemoglobin: "Hemoglobin carries oxygen through red blood cells.",
+  hba1c: "HbA1c estimates average blood sugar over about 2 to 3 months.",
+  fasting_glucose: "Fasting glucose is your blood sugar after not eating.",
+  tsh: "TSH is a hormone signal that helps check thyroid activity.",
+  testosterone: "Testosterone is a sex hormone linked with energy, muscle, and reproductive health.",
+  total_cholesterol: "Total cholesterol is the combined cholesterol measured in the blood.",
+  hdl: "HDL helps carry cholesterol away from blood vessels.",
+  ldl: "LDL carries cholesterol through the blood and is read with heart-risk context.",
+  triglycerides: "Triglycerides are a type of fat used for energy storage.",
+  crp: "CRP rises when there is inflammation somewhere in the body.",
+  creatinine: "Creatinine is a waste marker commonly used to review kidney filtering.",
+  urea: "Urea is a protein-breakdown waste marker linked with kidney and hydration context.",
+  rdw: "RDW shows how varied your red blood cell sizes are.",
+  wbc: "WBC counts white blood cells, which help fight infection.",
+  rbc: "RBC counts red blood cells, which carry oxygen.",
+  hematocrit: "Hematocrit shows how much of your blood volume is red blood cells.",
+  platelets: "Platelets help blood clot and stop bleeding.",
+  mcv: "MCV is the average size of your red blood cells.",
+  mch: "MCH is the average amount of hemoglobin in each red blood cell.",
+  mchc: "MCHC is the average concentration of hemoglobin in red blood cells.",
+  alt: "ALT is a liver enzyme that can rise when liver cells are stressed.",
+  ast: "AST is an enzyme found in the liver, muscles, and other tissues.",
+  egfr: "eGFR estimates how well the kidneys filter blood.",
+};
+
 loadSample.addEventListener("click", async () => {
   clearUploadError();
   setLoading(true, "Loading Sample...");
@@ -566,6 +614,7 @@ function createMarkerCard(marker) {
   const position = markerPosition(marker);
   const optimal = optimalRangePosition(marker);
   const tips = marker.tips.slice(0, 2).map((tip) => `<li>${escapeHtml(tip)}</li>`).join("");
+  const explainer = markerExplainer(marker);
 
   card.className = "marker-card";
   card.dataset.tone = tone;
@@ -581,7 +630,19 @@ function createMarkerCard(marker) {
         </span>
         <div class="marker-title">
           <div class="marker-category">${escapeHtml(marker.category)}</div>
-          <h2>${escapeHtml(marker.name)}</h2>
+          <h2>
+            ${escapeHtml(marker.name)}
+            <span class="term-help">
+              <button class="term-help-button" type="button" aria-label="Explain ${escapeHtml(marker.name)}">
+                <span class="material-symbols-outlined">help</span>
+              </button>
+              <span class="term-popover" role="tooltip">
+                <strong>${escapeHtml(marker.name)}</strong>
+                <span>${escapeHtml(glossaryTextForMarker(marker))}</span>
+                <a href="${escapeHtml(explainer.url)}" target="_blank" rel="noopener">Learn more: ${escapeHtml(explainer.source)}</a>
+              </span>
+            </span>
+          </h2>
         </div>
       </div>
       <span class="status-pill ${marker.status}">${labelForStatus(marker.status)}</span>
@@ -605,7 +666,7 @@ function createMarkerCard(marker) {
     </div>
 
     <div class="marker-info">
-      <h3><span class="material-symbols-outlined">info</span> What is this?</h3>
+      <h3><span class="material-symbols-outlined">info</span> What is it?</h3>
       <p>${escapeHtml(marker.about || marker.message)}</p>
     </div>
 
@@ -613,6 +674,20 @@ function createMarkerCard(marker) {
   `;
 
   return card;
+}
+
+function markerExplainer(marker) {
+  const mapped = markerLearnMore[marker.key];
+  if (mapped) {
+    return { source: mapped[0], url: mapped[1] };
+  }
+  const query = encodeURIComponent(`${marker.name} blood test`);
+  return { source: "MedlinePlus", url: `https://medlineplus.gov/search/?query=${query}` };
+}
+
+function glossaryTextForMarker(marker) {
+  if (markerGlossary[marker.key]) return markerGlossary[marker.key];
+  return `${marker.name} is a ${marker.category.toLowerCase()} marker. Open the source to learn the basics.`;
 }
 
 function createEmptyCard() {
